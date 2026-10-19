@@ -1,0 +1,187 @@
+"""Agent state persistence management for Hermes setup.
+
+Handles persistent state across deployments, ensuring that
+agent memory and configurations survive container updates.
+"""
+
+import json
+import shutil
+from pathlib import Path
+from typing import Optional, Dict, Any, List, Tuple
+
+
+class StateManager:
+    """Manages persistent state for Hermes agent deployment."""
+
+    def __init__(self, config: Optional[HermesConfig] = None):
+        self.config = config or HermesConfig()
+        self.project_root = Path.cwd()
+        self.data_dir = self.config.get_data_path()
+        self.state_dir = self.data_dir / ".state"
+        self.backup_dir = self.data_dir / "backups"
+        self.history_file = self.state_dir / "deployment_history.json"
+
+    def ensure_directories(self) -> None:
+        """Ensure state directories exist."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_deployment(
+        self,
+        image: str,
+        action: str,
+        notes: str = "",
+        timestamp: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Save a deployment record to history."""
+        import datetime
+
+        if timestamp is None:
+            timestamp = datetime.datetime.now().isoformat()
+
+        record = {
+            "timestamp": timestamp,
+            "image": image,
+            "action": action,
+            "notes": notes,
+        }
+
+        # Load existing history
+        history: List[Dict[str, Any]] = []
+        if self.history_file.exists():
+            try:
+                with open(self.history_file, "r") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, list):
+                        history = loaded
+            except (json.JSONDecodeError, IOError):
+                pass
+
+        history.append(record)
+        self.ensure_directories()
+        with open(self.history_file, "w") as f:
+            json.dump(history, f, indent=2)
+
+        return record
+
+    def get_deployment_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get recent deployment history."""
+        if not self.history_file.exists():
+            return []
+
+        try:
+            with open(self.history_file, "r") as f:
+                history = json.load(f)
+                if isinstance(history, list):
+                    return history[-limit:]
+        except (json.JSONDecodeError, IOError):
+            pass
+
+        return []
+
+    def backup_state(self, reason: str = "") -> Path:
+        """Create a backup of current persistent data."""
+        timestamp = _timestamp()
+        backup_name = f"hermes-backup-{timestamp}"
+        target_backup = self.backup_dir / backup_name
+
+        # Copy non-model directories if they exist
+        for directory in [self.data_dir, self.config.get_models_path()]:
+            if not directory.exists():
+                continue
+            shutil.copytree(directory, target_backup / directory.name)
+
+        # Copy state directory
+        if self.state_dir.exists():
+            shutil.copytree(self.state_dir, target_backup / "state")
+
+        return target_backup
+
+    def restore_backup(self, backup_path: Optional[Path] = None) -> bool:
+        """Restore from a backup directory."""
+        if not backup_path:
+            # Find latest backup
+            backups = sorted(
+                list(self.backup_dir.glob("hermes-backup-*")),
+                reverse=True,
+            )
+            if not backups:
+                return False
+            backup_path = backups[0]
+
+        for src_dir in backup_path.iterdir():
+            if not src_dir.is_dir():
+                continue
+            dest_dir = Path.cwd() / src_dir.name
+            if dest_dir.exists() and dest_dir != backup_path:
+                shutil.rmtree(dest_dir)
+            if src_dir.is_dir():
+                shutil.copytree(src_dir, dest_dir)
+
+        return True
+
+    def snapshot_volume(self) -> Optional[Path]:
+        """Create Docker volume snapshot (requires Docker)."""
+        try:
+            result = _run_command(["docker", "run", "--rm", "-v", f"{self.data_dir}:/data",
+                                  "-v", f"{self.backup_dir}:/backup",
+                                  "alpine", "tar", "cfz", "/backup/snapshot.tgz", "/data"])
+            if result.returncode == 0:
+                snapshot = self.backup_dir / "volumesnap.tgz"
+                return snapshot
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+        return None
+
+    def get_persistent_state_paths(self) -> Dict[str, Path]:
+        """Return all paths where persistent state is stored."""
+        return {
+            "data": self.data_dir,
+            "state": self.state_dir,
+            "backups": self.backup_dir,
+            "history": self.history_file,
+        }
+
+    def remove_state(self) -> None:
+        """Remove all persistent state (dangerous - use with caution)."""
+        dirs_to_remove = [
+            self.data_dir,
+            self.state_dir,
+            self.backup_dir,
+        ]
+        for d in dirs_to_remove:
+            if d.exists():
+                shutil.rmtree(d)
+                d.mkdir(parents=True, exist_ok=True)
+
+        # Reset history file
+        if self.history_file.exists():
+            self.history_file.unlink()
+
+    @property
+    def has_state(self) -> bool:
+        """Check if there is any existing persistent state."""
+        return any(p.exists() for p in self.get_persistent_state_paths().values())
+
+    def generate_state_restore_report(self) -> str:
+        """Generate a report of current persistent state."""
+        report_lines = ["=== Persistent State Report ==="]
+        paths = self.get_persistent_state_paths()
+        for name, path in paths.items():
+            exists = path.exists()
+            size = path.stat().st_size if exists else 0
+            report_lines.append(f"{name}: {'EXISTS' if exists else 'NOT FOUND'} ({size} bytes)")
+        return "\n".join(report_lines)
+
+
+def _timestamp() -> str:
+    """Generate a timestamp string."""
+    import datetime
+    return datetime.datetime.now().strformat(strftime="%Y%m%d_%H%M%S")
+
+
+def _run_command(cmd: list) -> subprocess.CompletedProcess:
+    """Run a command and return result."""
+    import subprocess
+    return subprocess.run(cmd, capture_output=True, text=True)

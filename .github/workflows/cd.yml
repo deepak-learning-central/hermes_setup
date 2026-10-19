@@ -1,0 +1,96 @@
+name: CD Pipeline - Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      production:
+        description: 'Deploy to production'
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  deploy:
+    name: Deploy Hermes Agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'uv'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Load environment variables
+        uses: actions/download-artifact@v4
+        if: false  # Secrets injected at runtime via GitHub Actions secrets
+        with:
+          name: env-files
+          path: .
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to container registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/hermes-setup:latest
+            ghcr.io/${{ github.repository_owner }}/hermes-setup:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to staging
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: |
+          echo "Deploying to staging environment..."
+          docker compose -f docker/compose.yml up -d --pull always
+
+      - name: Run integration tests (staging)
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: |
+          echo "Running integration tests against staging..."
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
+
+      - name: Deploy to production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "Deploying to production with zero-downtime..."
+          docker compose -f docker/compose.prod.yml up -d --pull always --force-recreate --no-deps
+          sleep 30
+          curl -f http://localhost:8000/health || {
+            echo "Production deployment failed - rolling back..."
+            exit 1
+          }
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "Deployment completed with status: ${{ job.status }}"

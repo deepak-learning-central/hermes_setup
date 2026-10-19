@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  hermes:
+    image: ${HERMES_DOCKER_IMAGE:-nousresearch/hermes:latest}
+    container_name: hermes-agent-prod
+    restart: unless-stopped
+    ports:
+      - "${HERMES_HOST_PORT:-8000}:${HERMES_CONTAINER_PORT:-8000}"
+    environment:
+      - MODEL_NAME=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
+      - CONTEXT_SIZE=${HERMES_CONTEXT_SIZE:-8192}
+      - TEMPERATURE=${HERMES_TEMPERATURE:-0.7}
+      - TOP_P=${HERMES_TOP_P:-0.9}
+      - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
+      - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
+    volumes:
+      - ${HERMES_DATA_DIR:-./data}:/app/data
+      - ${HERMES_MODELS_DIR:-./models}:/app/models
+    deploy:
+      resources:
+        limits:
+          memory: ${HERMES_MEMORY_LIMIT:-4g}
+          cpus: '${HERMES_CPUS_LIMIT:-2.0}'
+        reservations:
+          memory: 2g
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HERMES_CONTAINER_PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  hermes-data:
+    driver: local
+  hermes-models:
+    driver: local
+
+networks:
+  default:
+    name: hermes-network
+    external: false

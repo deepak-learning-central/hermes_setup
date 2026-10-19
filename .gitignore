@@ -1,0 +1,55 @@
+# Hermes Setup - Git Ignore Rules
+
+# Environment files - NEVER commit these!
+.env
+.env.*
+*.env
+*.env.local
+*.env.production
+
+# Secrets and credentials
+*secret*
+*credential*
+*password*
+*token*
+*key*.pem
+*key*.key
+
+# Data directories
+data/
+models/
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+uv.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test output
+test-results/
+htmlcov/
