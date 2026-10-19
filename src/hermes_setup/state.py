@@ -6,14 +6,17 @@ agent memory and configurations survive container updates.
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any
+
+from hermes_setup.config import HermesConfig
 
 
 class StateManager:
     """Manages persistent state for Hermes agent deployment."""
 
-    def __init__(self, config: Optional[HermesConfig] = None):
+    def __init__(self, config: HermesConfig | None = None):
         self.config = config or HermesConfig()
         self.project_root = Path.cwd()
         self.data_dir = self.config.get_data_path()
@@ -32,8 +35,8 @@ class StateManager:
         image: str,
         action: str,
         notes: str = "",
-        timestamp: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        timestamp: str | None = None,
+    ) -> dict[str, Any]:
         """Save a deployment record to history."""
         import datetime
 
@@ -48,14 +51,14 @@ class StateManager:
         }
 
         # Load existing history
-        history: List[Dict[str, Any]] = []
+        history: list[dict[str, Any]] = []
         if self.history_file.exists():
             try:
-                with open(self.history_file, "r") as f:
+                with open(self.history_file) as f:
                     loaded = json.load(f)
                     if isinstance(loaded, list):
                         history = loaded
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
 
         history.append(record)
@@ -65,17 +68,17 @@ class StateManager:
 
         return record
 
-    def get_deployment_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_deployment_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get recent deployment history."""
         if not self.history_file.exists():
             return []
 
         try:
-            with open(self.history_file, "r") as f:
+            with open(self.history_file) as f:
                 history = json.load(f)
                 if isinstance(history, list):
                     return history[-limit:]
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
         return []
@@ -98,7 +101,7 @@ class StateManager:
 
         return target_backup
 
-    def restore_backup(self, backup_path: Optional[Path] = None) -> bool:
+    def restore_backup(self, backup_path: Path | None = None) -> bool:
         """Restore from a backup directory."""
         if not backup_path:
             # Find latest backup
@@ -121,7 +124,7 @@ class StateManager:
 
         return True
 
-    def snapshot_volume(self) -> Optional[Path]:
+    def snapshot_volume(self) -> Path | None:
         """Create Docker volume snapshot (requires Docker)."""
         try:
             result = _run_command(["docker", "run", "--rm", "-v", f"{self.data_dir}:/data",
@@ -134,7 +137,7 @@ class StateManager:
             pass
         return None
 
-    def get_persistent_state_paths(self) -> Dict[str, Path]:
+    def get_persistent_state_paths(self) -> dict[str, Path]:
         """Return all paths where persistent state is stored."""
         return {
             "data": self.data_dir,
@@ -183,5 +186,4 @@ def _timestamp() -> str:
 
 def _run_command(cmd: list) -> subprocess.CompletedProcess:
     """Run a command and return result."""
-    import subprocess
     return subprocess.run(cmd, capture_output=True, text=True)

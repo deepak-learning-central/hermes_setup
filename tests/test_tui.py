@@ -1,7 +1,8 @@
 """Test Terminal User Interface components."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from hermes_setup.config import HermesConfig
 
@@ -26,7 +27,7 @@ class TestTUI:
         """Test orchestrator status parsing."""
         from hermes_setup.docker import DockerOrchestrator
 
-        orchestrator = DockerOrchestrator(config)
+        DockerOrchestrator(config)
         status = {"running": False, "containers": []}
         assert "running" in status
         assert "containers" in status
@@ -62,7 +63,7 @@ class TestTUI:
 
     def test_port_validation(self):
         """Test port validation."""
-        from hermes_setup.utils import is_port_in_use, validate_port, find_available_port
+        from hermes_setup.utils import find_available_port, validate_port
 
         assert validate_port(8080) is True
         assert validate_port(0) is False
@@ -124,16 +125,16 @@ class TestCLIDebug:
     def test_utils_import(self):
         """Test utils module import."""
         from hermes_setup.utils import (
+            find_available_port,
+            format_bytes,
+            get_system_info,
             is_docker_available,
             is_docker_compose_available,
             is_port_in_use,
-            find_available_port,
-            get_system_info,
             parse_bool,
-            safe_int,
             safe_float,
+            safe_int,
             truncate_string,
-            format_bytes,
             validate_port,
         )
         assert callable(is_docker_available)
@@ -205,8 +206,8 @@ class TestSecretsManager:
 
     def test_detect_secrets_in_content(self):
         """Test secret detection in content."""
-        from hermes_setup.secrets import SecretsManager
         from hermes_setup.config import HermesConfig
+        from hermes_setup.secrets import SecretsManager
 
         config = HermesConfig()
         manager = SecretsManager(config)
@@ -224,8 +225,8 @@ class TestSecretsManager:
 
     def test_env_template_generation(self):
         """Test env template generation."""
-        from hermes_setup.secrets import SecretsManager
         from hermes_setup.config import HermesConfig
+        from hermes_setup.secrets import SecretsManager
 
         config = HermesConfig()
         manager = SecretsManager(config)

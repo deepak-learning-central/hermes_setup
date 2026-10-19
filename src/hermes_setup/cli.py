@@ -1,19 +1,15 @@
 """Command-line interface for Hermes agent setup using Typer."""
 
-import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .config import HermesConfig, load_config
+from .config import load_config
 from .docker import DockerOrchestrator
-from .secrets import SecretsManager
 from .state import StateManager
-from .utils import container_exists, container_running
 
 app = typer.Typer(
     name="hermes-setup",
@@ -26,7 +22,7 @@ console = Console()
 
 @app.command()
 def init(
-    config_file: Optional[Path] = typer.Option(
+    config_file: Path | None = typer.Option(
         None, "--config", "-c", help="Path to config file"
     )
 ) -> None:
@@ -188,7 +184,7 @@ def update(
 
 @app.command()
 def config(
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Config variable to read"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Config variable to read"),
 ) -> None:
     """Show or edit configuration."""
     config = load_config()
@@ -203,7 +199,7 @@ def config(
         table = Table(title="Hermes Configuration")
         table.add_column("Variable", style="bold")
         table.add_column("Value")
-        for field_name, field_info in config.model_fields.items():
+        for field_name, _field_info in config.model_fields.items():
             value = getattr(config, field_name)
             table.add_row(field_name, str(value))
         console.print(table)
@@ -224,7 +220,7 @@ def backup(
 
 @app.command()
 def restore(
-    backup_path: Optional[Path] = typer.Option(None, "--path", "-p", help="Backup path")
+    backup_path: Path | None = typer.Option(None, "--path", "-p", help="Backup path")
 ) -> None:
     """Restore from backup."""
     config = load_config()
@@ -258,7 +254,7 @@ def diagnose() -> None:
 
 @app.command("generate:env-template")
 def generate_env_template(
-    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Output path")
+    path: Path | None = typer.Option(None, "--path", "-p", help="Output path")
 ) -> None:
     """Generate .env.example template."""
     orchestrator = DockerOrchestrator()

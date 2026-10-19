@@ -1,8 +1,6 @@
 """Configuration management for Hermes agent setup using Pydantic Settings."""
 
-import os
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -99,11 +97,11 @@ class HermesConfig(BaseSettings):
     )
 
     # Optional API keys (loaded from environment)
-    hf_token: Optional[str] = Field(
+    hf_token: str | None = Field(
         default=None,
         description="HuggingFace token for private models",
     )
-    openai_api_key: Optional[str] = Field(
+    openai_api_key: str | None = Field(
         default=None,
         description="OpenAI API key (if using OpenAI models)",
     )
@@ -113,7 +111,7 @@ class HermesConfig(BaseSettings):
         default="INFO",
         description="Log level (DEBUG, INFO, WARNING, ERROR)",
     )
-    log_file: Optional[str] = Field(
+    log_file: str | None = Field(
         default=None,
         description="Optional log file path",
     )

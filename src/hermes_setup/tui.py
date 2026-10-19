@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
-from typing import Optional
 
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
-from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
@@ -23,15 +20,9 @@ from textual.widgets import (
     Label,
     Log,
     Markdown,
-    ProgressBar,
-    RadioButton,
-    RadioSet,
-    Select,
     Static,
     TabbedContent,
     TabPane,
-    TextArea,
-    Tree,
 )
 
 from .config import HermesConfig, load_config

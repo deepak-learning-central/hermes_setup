@@ -1,10 +1,10 @@
 """Docker Compose orchestration for Hermes agent."""
 
+import contextlib
 import os
 import subprocess
-import shutil
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 from .config import HermesConfig, get_default_env_template
 
@@ -12,7 +12,7 @@ from .config import HermesConfig, get_default_env_template
 class DockerOrchestrator:
     """Manages Docker Compose operations for Hermes agent."""
 
-    def __init__(self, config: Optional[HermesConfig] = None):
+    def __init__(self, config: HermesConfig | None = None):
         self.config = config or HermesConfig()
         self.project_root = Path.cwd()
         self.compose_file = self.project_root / self.config.docker_compose_file
@@ -20,8 +20,8 @@ class DockerOrchestrator:
 
     def _run_compose(
         self,
-        args: List[str],
-        env: Optional[Dict[str, str]] = None,
+        args: list[str],
+        env: dict[str, str] | None = None,
         check: bool = True,
     ) -> subprocess.CompletedProcess:
         """Run docker compose command with proper environment."""
@@ -33,8 +33,8 @@ class DockerOrchestrator:
 
     def _run_compose_prod(
         self,
-        args: List[str],
-        env: Optional[Dict[str, str]] = None,
+        args: list[str],
+        env: dict[str, str] | None = None,
         check: bool = True,
     ) -> subprocess.CompletedProcess:
         """Run docker compose with production file."""
@@ -70,7 +70,7 @@ class DockerOrchestrator:
         except (subprocess.SubprocessError, FileNotFoundError):
             return False
 
-    def validate_environment(self) -> List[str]:
+    def validate_environment(self) -> list[str]:
         """Validate Docker environment and return list of issues."""
         issues = []
         if not self.check_docker():
@@ -183,7 +183,7 @@ networks:
         self.stop(production)
         return self.start(production)
 
-    def status(self, production: bool = False) -> Dict[str, Any]:
+    def status(self, production: bool = False) -> dict[str, Any]:
         """Get container status."""
         args = ["ps", "--format", "json"]
         if production:
@@ -198,10 +198,8 @@ networks:
         containers = []
         for line in result.stdout.strip().split("\n"):
             if line:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     containers.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
 
         running = any(c.get("State") == "running" for c in containers)
         return {"running": running, "containers": containers}
@@ -276,12 +274,12 @@ networks:
             return self._run_compose_prod(args, check=False).returncode == 0
         return self._run_compose(args, check=False).returncode == 0
 
-    def generate_env_example(self, path: Optional[Path] = None) -> None:
+    def generate_env_example(self, path: Path | None = None) -> None:
         """Generate .env.example file."""
         target = path or (self.project_root / ".env.example")
         target.write_text(get_default_env_template())
 
-    def generate_gitignore(self, path: Optional[Path] = None) -> None:
+    def generate_gitignore(self, path: Path | None = None) -> None:
         """Generate .gitignore file."""
         target = path or (self.project_root / ".gitignore")
         content = """# Hermes Setup - Git Ignore Rules
@@ -338,7 +336,7 @@ Thumbs.db
 """
         target.write_text(content)
 
-    def generate_pre_commit_config(self, path: Optional[Path] = None) -> None:
+    def generate_pre_commit_config(self, path: Path | None = None) -> None:
         """Generate .pre-commit-config.yaml for secret detection."""
         target = path or (self.project_root / ".pre-commit-config.yaml")
         content = """# Pre-commit hooks for Hermes Setup
@@ -415,7 +413,7 @@ repos:
 """
         target.write_text(content)
 
-    def generate_gitleaks_config(self, path: Optional[Path] = None) -> None:
+    def generate_gitleaks_config(self, path: Path | None = None) -> None:
         """Generate .gitleaks.toml configuration."""
         target = path or (self.project_root / ".gitleaks.toml")
         content = """# Gitleaks configuration for Hermes Setup

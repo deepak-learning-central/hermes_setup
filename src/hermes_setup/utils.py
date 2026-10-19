@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 def is_docker_available() -> bool:
@@ -38,7 +38,7 @@ def is_docker_compose_available() -> bool:
         return False
 
 
-def get_system_info() -> Dict[str, str]:
+def get_system_info() -> dict[str, str]:
     """Get system information for diagnostics."""
     return {
         "platform": platform.system(),
@@ -63,11 +63,11 @@ def is_port_in_use(port: int, host: str = "localhost") -> bool:
             sock.settimeout(1)
             result = sock.connect_ex((host, port))
             return result == 0
-    except socket.error:
+    except OSError:
         return False
 
 
-def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> Optional[int]:
+def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int | None:
     """Find an available port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
         if validate_port(port) and not is_port_in_use(port):
@@ -75,7 +75,7 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> Opti
     return None
 
 
-def hash_file(filepath: Path, algorithm: str = "sha256") -> Optional[str]:
+def hash_file(filepath: Path, algorithm: str = "sha256") -> str | None:
     """Compute hash of a file."""
     try:
         hash_obj = hashlib.new(algorithm)
@@ -87,14 +87,14 @@ def hash_file(filepath: Path, algorithm: str = "sha256") -> Optional[str]:
         return None
 
 
-def read_env_file(filepath: Path) -> Dict[str, str]:
+def read_env_file(filepath: Path) -> dict[str, str]:
     """Parse a .env file into a dictionary."""
     env_vars = {}
     if not filepath.exists():
         return env_vars
 
-    with open(filepath, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
+    with open(filepath, encoding="utf-8") as f:
+        for _line_num, line in enumerate(f, 1):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
@@ -104,31 +104,29 @@ def read_env_file(filepath: Path) -> Dict[str, str]:
             key = key.strip()
             value = value.strip()
             # Remove quotes if present
-            if value.startswith('"') and value.endswith('"'):
-                value = value[1:-1]
-            elif value.startswith("'") and value.endswith("'"):
+            if value.startswith('"') and value.endswith('"') or value.startswith("'") and value.endswith("'"):
                 value = value[1:-1]
             env_vars[key] = value
     return env_vars
 
 
-def write_env_file(filepath: Path, env_vars: Dict[str, str]) -> None:
+def write_env_file(filepath: Path, env_vars: dict[str, str]) -> None:
     """Write environment variables to a .env file."""
     with open(filepath, "w", encoding="utf-8") as f:
         for key, value in sorted(env_vars.items()):
             f.write(f"{key}={value}\n")
 
 
-def merge_env_files(*files: Path) -> Dict[str, str]:
+def merge_env_files(*files: Path) -> dict[str, str]:
     """Merge multiple .env files (later files override earlier ones)."""
-    merged: Dict[str, str] = {}
+    merged: dict[str, str] = {}
     for file in files:
         if file.exists():
             merged.update(read_env_file(file))
     return merged
 
 
-def validate_required_env(required: List[str], env: Dict[str, str]) -> Tuple[List[str], List[str]]:
+def validate_required_env(required: list[str], env: dict[str, str]) -> tuple[list[str], list[str]]:
     """Check for required environment variables."""
     present = [var for var in required if var in env and env[var]]
     missing = [var for var in required if var not in env or not env[var]]
@@ -213,7 +211,7 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def get_container_id_from_name(name: str) -> Optional[str]:
+def get_container_id_from_name(name: str) -> str | None:
     """Get container ID from container name."""
     try:
         result = subprocess.run(

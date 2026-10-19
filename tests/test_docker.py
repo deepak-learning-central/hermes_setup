@@ -1,8 +1,6 @@
 """Test Docker orchestration."""
 
-import os
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -66,13 +64,11 @@ class TestDockerOrchestrator:
 
     def test_validate_environment(self, orchestrator):
         """Test environment validation."""
-        with patch.object(orchestrator, "check_docker", return_value=True):
-            with patch.object(orchestrator, "check_compose", return_value=True):
-                with patch.object(
-                    orchestrator.compose_file, "exists", return_value=True
-                ):
-                    issues = orchestrator.validate_environment()
-                    assert len(issues) == 0
+        with patch.object(orchestrator, "check_docker", return_value=True), \
+             patch.object(orchestrator, "check_compose", return_value=True), \
+             patch.object(orchestrator.compose_file, "exists", return_value=True):
+            issues = orchestrator.validate_environment()
+            assert len(issues) == 0
 
     def test_generate_compose_file(self, orchestrator):
         """Test compose file generation."""
@@ -181,20 +177,18 @@ class TestDockerOrchestrator:
         monkeypatch.chdir(tmp_path)
 
         # Mock file system operations
-        with patch.object(orchestrator, "write_compose_files"):
-            with patch.object(orchestrator, "generate_env_example"):
-                with patch.object(orchestrator, "generate_gitignore"):
-                    with patch.object(orchestrator, "generate_pre_commit_config"):
-                        with patch.object(
-                            orchestrator.config, "ensure_directories"
-                        ):
-                            orchestrator.init_project()
-                            # Verify all methods were called
-                            assert orchestrator.write_compose_files.called
-                            assert orchestrator.generate_env_example.called
-                            assert orchestrator.generate_gitignore.called
-                            assert orchestrator.generate_pre_commit_config.called
-                            assert orchestrator.config.ensure_directories.called
+        with patch.object(orchestrator, "write_compose_files"), \
+             patch.object(orchestrator, "generate_env_example"), \
+             patch.object(orchestrator, "generate_gitignore"), \
+             patch.object(orchestrator, "generate_pre_commit_config"), \
+             patch.object(orchestrator.config, "ensure_directories"):
+            orchestrator.init_project()
+            # Verify all methods were called
+            assert orchestrator.write_compose_files.called
+            assert orchestrator.generate_env_example.called
+            assert orchestrator.generate_gitignore.called
+            assert orchestrator.generate_pre_commit_config.called
+            assert orchestrator.config.ensure_directories.called
 
 
 if __name__ == "__main__":
