@@ -57,7 +57,7 @@ jobs:
         run: uv sync --frozen --all-extras
 
       - name: Run tests
-        run: uv run pytest --cov=src.hermes_setup --cov-report=xml
+        run: uv run pytest --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -87,7 +87,7 @@ jobs:
         run: uv run bandit -r src -ll -f json -o bandit-report.json || true
 
       - name: Run Safety (dependency check)
-        run: uv run safety check --json --output safety-report.json || true
+        run: uv run safety check --json > safety-report.json || true
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
