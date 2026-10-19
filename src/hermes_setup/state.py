@@ -210,6 +210,6 @@ def _timestamp() -> str:
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-def _run_command(cmd: list) -> subprocess.CompletedProcess:
+def _run_command(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     """Run a command and return result."""
     return subprocess.run(cmd, capture_output=True, text=True)

@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +90,7 @@ def hash_file(filepath: Path, algorithm: str = "sha256") -> str | None:
 
 def read_env_file(filepath: Path) -> dict[str, str]:
     """Parse a .env file into a dictionary."""
-    env_vars = {}
+    env_vars: dict[str, str] = {}
     if not filepath.exists():
         return env_vars
 
@@ -147,31 +148,47 @@ def truncate_string(text: str, max_length: int = 100) -> str:
 
 def format_bytes(bytes_count: int) -> str:
     """Format byte count into human readable form."""
+    remaining = float(bytes_count)
     for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if bytes_count < 1024.0:
-            return f"{bytes_count:.1f} {unit}"
-        bytes_count /= 1024.0
-    return f"{bytes_count:.1f} PB"
+        if remaining < 1024.0:
+            return f"{remaining:.1f} {unit}"
+        remaining /= 1024.0
+    return f"{remaining:.1f} PB"
 
 
-def run_with_spinner(message: str, func) -> Any:
+def run_with_spinner(message: str, func: Callable[[], Any]) -> Any:
     """Run a function with a spinner message (for CLI feedback)."""
     import itertools
     import threading
 
     spinner = itertools.cycle(["-", "\\", "|", "/"])
     done = False
-    result = [None]
-    error = [None]
+    result: list[Any] = [None]
+    error: list[BaseException | None] = [None]
 
-    def worker():
+    def worker() -> None:
         try:
             result[0] = func()
-        except Exception as e:
+        except BaseException as e:
             error[0] = e
         finally:
             nonlocal done
             done = True
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+
+    while not done:
+        sys.stdout.write(f"\r{message} {next(spinner)}")
+        sys.stdout.flush()
+        time.sleep(0.1)
+
+    sys.stdout.write("\r" + " " * (len(message) + 2) + "\r")
+    sys.stdout.flush()
+
+    if error[0] is not None:
+        raise error[0]
+    return result[0]
 
     thread = threading.Thread(target=worker)
     thread.start()

@@ -23,7 +23,7 @@ class DockerOrchestrator:
         args: list[str],
         env: dict[str, str] | None = None,
         check: bool = True,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         """Run docker compose command with proper environment."""
         cmd = ["docker", "compose", "-f", str(self.compose_file)] + args
         merged_env = os.environ.copy()
@@ -36,7 +36,7 @@ class DockerOrchestrator:
         args: list[str],
         env: dict[str, str] | None = None,
         check: bool = True,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         """Run docker compose with production file."""
         cmd = ["docker", "compose", "-f", str(self.compose_prod_file)] + args
         merged_env = os.environ.copy()
@@ -215,7 +215,7 @@ networks:
         else:
             result = self._run_compose(args, check=False)
 
-        return result.stdout if result.returncode == 0 else result.stderr
+        return result.stdout or "" if result.returncode == 0 else result.stderr or ""
 
     def update(self, production: bool = False) -> bool:
         """Update Hermes agent to latest image."""

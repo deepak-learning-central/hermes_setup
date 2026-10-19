@@ -63,7 +63,7 @@ class LogViewer(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Container Logs", classes="section-title")
-        yield Log(id="log-viewer", highlight=True, markup=True)
+        yield Log(id="log-viewer", highlight=True)
 
 
 class SetupWizard(ModalScreen):
@@ -101,7 +101,7 @@ class SetupWizard(ModalScreen):
         self.orchestrator = DockerOrchestrator(config)
         self.step = 0
         self.steps = ["docker", "ports", "storage", "model", "secrets", "complete"]
-        self.form_data = {}
+        self.form_data: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         with Container(id="wizard-container"):
