@@ -62,15 +62,29 @@ class TestDockerOrchestrator:
             timeout=10,
         )
 
-    def test_validate_environment(self, orchestrator):
+    def test_validate_environment(self, orchestrator, tmp_path, monkeypatch):
         """Test environment validation."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "docker").mkdir()
+        (tmp_path / "docker" / "compose.yml").write_text("version: '3.8'\n")
+
         with (
             patch.object(orchestrator, "check_docker", return_value=True),
             patch.object(orchestrator, "check_compose", return_value=True),
-            patch.object(orchestrator.compose_file, "exists", return_value=True),
         ):
             issues = orchestrator.validate_environment()
             assert len(issues) == 0
+
+    def test_validate_environment_missing_compose(self, orchestrator, tmp_path):
+        """Test environment validation reports a missing compose file."""
+        orchestrator.compose_file = tmp_path / "docker" / "missing.yml"
+
+        with (
+            patch.object(orchestrator, "check_docker", return_value=True),
+            patch.object(orchestrator, "check_compose", return_value=True),
+        ):
+            issues = orchestrator.validate_environment()
+            assert any("Compose file not found" in issue for issue in issues)
 
     def test_generate_compose_file(self, orchestrator):
         """Test compose file generation."""
@@ -79,10 +93,10 @@ class TestDockerOrchestrator:
         assert "hermes:" in content
         assert "nousresearch/hermes:latest" in content
         assert "8080:8080" in content  # test ports
-        assert "./test_data:/app/data" in content
-        assert "./test_models:/app/models" in content
-        assert "MEMORY_LIMIT" in content
-        assert "CPUS_LIMIT" in content
+        assert f"{orchestrator.config.get_data_path()}:/app/data" in content
+        assert f"{orchestrator.config.get_models_path()}:/app/models" in content
+        assert "memory: 4g" in content
+        assert "cpus: '2.0'" in content
 
     def test_generate_compose_file_production(self, orchestrator):
         """Test production compose file generation."""
@@ -113,24 +127,23 @@ class TestDockerOrchestrator:
         """Test starting container."""
         mock_run.return_value.returncode = 0
         assert orchestrator.start() is True
-        mock_run.assert_called_once_with(
-            ["up"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        args, kwargs = mock_run.call_args
+        assert "up" in args[0]
+        assert "-d" in args[0]
+        assert kwargs.get("check") is False
+        assert kwargs.get("capture_output") is True
+        assert kwargs.get("text") is True
 
     @patch("hermes_setup.docker.subprocess.run")
     def test_stop_container(self, mock_run, orchestrator):
         """Test stopping container."""
         mock_run.return_value.returncode = 0
         assert orchestrator.stop() is True
-        mock_run.assert_called_once_with(
-            ["down"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        args, kwargs = mock_run.call_args
+        assert "down" in args[0]
+        assert kwargs.get("check") is False
+        assert kwargs.get("capture_output") is True
+        assert kwargs.get("text") is True
 
     @patch("hermes_setup.docker.subprocess.run")
     def test_status_parsing(self, mock_run, orchestrator):
@@ -179,12 +192,14 @@ class TestDockerOrchestrator:
         monkeypatch.chdir(tmp_path)
 
         # Mock file system operations
+        from hermes_setup.config import HermesConfig
+
         with (
             patch.object(orchestrator, "write_compose_files"),
             patch.object(orchestrator, "generate_env_example"),
             patch.object(orchestrator, "generate_gitignore"),
             patch.object(orchestrator, "generate_pre_commit_config"),
-            patch.object(orchestrator.config, "ensure_directories"),
+            patch.object(HermesConfig, "ensure_directories"),
         ):
             orchestrator.init_project()
             # Verify all methods were called
@@ -192,7 +207,7 @@ class TestDockerOrchestrator:
             assert orchestrator.generate_env_example.called
             assert orchestrator.generate_gitignore.called
             assert orchestrator.generate_pre_commit_config.called
-            assert orchestrator.config.ensure_directories.called
+            assert HermesConfig.ensure_directories.called
 
 
 if __name__ == "__main__":

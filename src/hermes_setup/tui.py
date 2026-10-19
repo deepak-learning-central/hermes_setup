@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any, Literal
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -11,6 +12,7 @@ from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
+from textual.widget import Widget
 from textual.widgets import (
     Button,
     DataTable,
@@ -29,6 +31,8 @@ from .config import HermesConfig, load_config
 from .docker import DockerOrchestrator
 from .state import StateManager
 from .utils import get_system_info, is_docker_available, is_docker_compose_available
+
+ButtonVariant = Literal["default", "primary", "success", "warning", "error"]
 
 
 class DockerStatus(Static):
@@ -66,7 +70,7 @@ class LogViewer(Static):
         yield Log(id="log-viewer", highlight=True)
 
 
-class SetupWizard(ModalScreen):
+class SetupWizard(ModalScreen[Any]):
     """First-run setup wizard screen."""
 
     CSS = """
@@ -142,7 +146,7 @@ class SetupWizard(ModalScreen):
         else:
             buttons.mount(Button("Finish", id="wizard-finish", variant="success"))
 
-    def _show_docker_step(self, content: Vertical) -> None:
+    def _show_docker_step(self, content: Widget) -> None:
         docker_ok = is_docker_available()
         compose_ok = is_docker_compose_available()
         content.mount(Label(f"Docker: {'✓ Available' if docker_ok else '✗ Not available'}"))
@@ -152,7 +156,7 @@ class SetupWizard(ModalScreen):
         if not docker_ok:
             content.mount(Label("[red]Please install Docker before continuing[/red]"))
 
-    def _show_ports_step(self, content: Vertical) -> None:
+    def _show_ports_step(self, content: Widget) -> None:
         content.mount(Label("Port Configuration"))
         host_input = Input(
             value=str(self.config.host_port),
@@ -169,7 +173,7 @@ class SetupWizard(ModalScreen):
         content.mount(Label("Container Port:"))
         content.mount(container_input)
 
-    def _show_storage_step(self, content: Vertical) -> None:
+    def _show_storage_step(self, content: Widget) -> None:
         content.mount(Label("Persistent Storage"))
         data_input = Input(
             value=self.config.data_dir,
@@ -186,7 +190,7 @@ class SetupWizard(ModalScreen):
         content.mount(Label("Models Directory:"))
         content.mount(models_input)
 
-    def _show_model_step(self, content: Vertical) -> None:
+    def _show_model_step(self, content: Widget) -> None:
         content.mount(Label("Model Configuration"))
         model_input = Input(
             value=self.config.model_name,
@@ -196,7 +200,7 @@ class SetupWizard(ModalScreen):
         content.mount(Label("Model Name:"))
         content.mount(model_input)
 
-    def _show_secrets_step(self, content: Vertical) -> None:
+    def _show_secrets_step(self, content: Widget) -> None:
         content.mount(Label("API Keys (optional)"))
         hf_input = Input(
             value=self.config.hf_token or "",
@@ -215,7 +219,7 @@ class SetupWizard(ModalScreen):
         content.mount(Label("OpenAI API Key:"))
         content.mount(openai_input)
 
-    def _show_complete_step(self, content: Vertical) -> None:
+    def _show_complete_step(self, content: Widget) -> None:
         content.mount(Label("[green]Setup Complete![/green]"))
         content.mount(Label("Click Finish to save configuration and create project files."))
 
@@ -223,7 +227,7 @@ class SetupWizard(ModalScreen):
     def next_step(self) -> None:
         self.save_current_step()
         self.step += 1
-        self.query_one("#wizard-title").update(
+        self.query_one("#wizard-title", Label).update(
             f"[bold]Hermes Setup Wizard - Step {self.step + 1}/{len(self.steps)}[/bold]"
         )
         self.show_step()
@@ -231,7 +235,7 @@ class SetupWizard(ModalScreen):
     @on(Button.Pressed, "#wizard-back")
     def back_step(self) -> None:
         self.step -= 1
-        self.query_one("#wizard-title").update(
+        self.query_one("#wizard-title", Label).update(
             f"[bold]Hermes Setup Wizard - Step {self.step + 1}/{len(self.steps)}[/bold]"
         )
         self.show_step()
@@ -267,7 +271,7 @@ class SetupWizard(ModalScreen):
                 self.config.openai_api_key = openai_key
 
 
-class ConfigScreen(Screen):
+class ConfigScreen(Screen[Any]):
     """Configuration management screen."""
 
     BINDINGS = [
@@ -359,7 +363,7 @@ class ConfigScreen(Screen):
         self.app.pop_screen()
 
 
-class LogScreen(Screen):
+class LogScreen(Screen[Any]):
     """Log viewer screen."""
 
     BINDINGS = [
@@ -391,7 +395,7 @@ class LogScreen(Screen):
         log_widget.write(logs)
 
 
-class ManagementScreen(Screen):
+class ManagementScreen(Screen[Any]):
     """Management operations screen."""
 
     BINDINGS = [
@@ -412,7 +416,7 @@ class ManagementScreen(Screen):
 
     def on_mount(self) -> None:
         container = self.query_one("#management-buttons")
-        actions = [
+        actions: list[tuple[str, str, ButtonVariant]] = [
             ("Create Backup", "backup", "primary"),
             ("Restore Backup", "restore", "default"),
             ("Cleanup (no volumes)", "cleanup", "warning"),
@@ -454,10 +458,10 @@ class ManagementScreen(Screen):
     def do_state_report(self) -> None:
         state_manager = StateManager(self.config)
         report = state_manager.generate_state_restore_report()
-        self.app.notify(report, severity="info")
+        self.app.notify(report, severity="information")
 
 
-class HermesSetupApp(App):
+class HermesSetupApp(App[Any]):
     """Main Hermes Setup TUI Application."""
 
     CSS = """
@@ -516,8 +520,8 @@ class HermesSetupApp(App):
                     yield Button("Restart", id="btn-restart", variant="primary")
             with Vertical(id="content"):
                 yield TabbedContent(
-                    TabPane("Dashboard", Markdown(id="dashboard-content")),
-                    TabPane("Logs", Log(id="main-log-viewer")),
+                    TabPane("Dashboard", Markdown(id="dashboard-content")),  # type: ignore[arg-type]
+                    TabPane("Logs", Log(id="main-log-viewer")),  # type: ignore[arg-type]
                 )
         yield Footer()
 
@@ -526,7 +530,7 @@ class HermesSetupApp(App):
         if self.first_run:
             self.push_screen(SetupWizard(self.config), self.on_wizard_done)
 
-    def on_wizard_done(self, result: bool) -> None:
+    def on_wizard_done(self, result: Any | None) -> None:
         if result:
             self.refresh_status()
             self.first_run = False
@@ -567,7 +571,7 @@ class HermesSetupApp(App):
         # Dashboard
         dashboard = self.query_one("#dashboard-content", Markdown)
         status_emoji = "🟢" if status["running"] else "🔴"
-        dashboard.update(f"""
+        dashboard_content = f"""
 # Hermes Agent Dashboard
 
 **Status:** {status_emoji} {"Running" if status["running"] else "Stopped"}
@@ -579,11 +583,12 @@ class HermesSetupApp(App):
 - Press `m` for Management
 
 **Persistent State:**
-""")
+"""
         paths = self.state_manager.get_persistent_state_paths()
         for name, path in paths.items():
             exists = "✅" if path.exists() else "❌"
-            dashboard.update(dashboard.text + f"\n- {name}: {exists}")
+            dashboard_content += f"\n- {name}: {exists}"
+        dashboard.update(dashboard_content)
 
     @on(Button.Pressed, "#btn-start")
     async def start_container(self) -> None:
@@ -618,7 +623,7 @@ class HermesSetupApp(App):
     def action_refresh(self) -> None:
         self.refresh_status()
 
-    def action_push_screen(self, screen_name: str) -> None:
+    def action_push_screen(self, screen_name: str) -> None:  # type: ignore[override]
         """Push a screen by name."""
         screens = {
             "status": None,  # Dashboard is main screen
@@ -627,7 +632,7 @@ class HermesSetupApp(App):
             "management": ManagementScreen(self.config, self.orchestrator),
         }
         if screen_name in screens and screens[screen_name]:
-            self.push_screen(screens[screen_name])
+            self.push_screen(screens[screen_name])  # type: ignore[arg-type]
 
 
 def launch_tui() -> None:

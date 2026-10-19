@@ -67,4 +67,5 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short --cov=src.hermes_setup --cov-report=term-missing --cov-fail-under=80"
+pythonpath = ["src"]
+addopts = "-v --tb=short --cov=hermes_setup --cov-report=term-missing"

@@ -116,6 +116,11 @@ class HermesConfig(BaseSettings):
         description="Optional log file path",
     )
 
+    @staticmethod
+    def get_default_env_template() -> str:
+        """Get default .env.example template."""
+        return get_default_env_template()
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

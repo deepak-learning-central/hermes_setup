@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from hermes_setup.config import HermesConfig
+from .config import HermesConfig
 
 
 class StateManager:
@@ -95,6 +95,7 @@ class StateManager:
             if not directory.exists():
                 continue
             dest = target_backup / directory.name
+            dest.mkdir(parents=True, exist_ok=True)
             for item in directory.iterdir():
                 if item == self.backup_dir:
                     continue

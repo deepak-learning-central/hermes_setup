@@ -172,11 +172,14 @@ networks:
             return self._run_compose_prod(args, check=False).returncode == 0
         return self._run_compose(args, check=False).returncode == 0
 
-    def stop(self, production: bool = False) -> bool:
+    def stop(self, production: bool = False, volumes: bool = False) -> bool:
         """Stop Hermes agent containers."""
+        args = ["down"]
+        if volumes:
+            args.append("-v")
         if production:
-            return self._run_compose_prod(["down"], check=False).returncode == 0
-        return self._run_compose(["down"], check=False).returncode == 0
+            return self._run_compose_prod(args, check=False).returncode == 0
+        return self._run_compose(args, check=False).returncode == 0
 
     def restart(self, production: bool = False) -> bool:
         """Restart Hermes agent containers."""
