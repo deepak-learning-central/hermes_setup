@@ -90,7 +90,7 @@ class StateManager:
 
         # Copy non-model directories if they exist
         # Exclude backups dir itself to avoid path nesting issues
-        excluded_dirs = {self.backup_dir, self.history_file.parent}
+
         for directory in [self.data_dir, self.config.get_models_path()]:
             if not directory.exists():
                 continue
