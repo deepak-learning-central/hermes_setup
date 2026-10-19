@@ -93,6 +93,7 @@ class TestTUIComponents:
         """Test TUI module imports."""
         try:
             from hermes_setup.tui import HermesSetupApp, SetupWizard
+
             assert HermesSetupApp is not None
             assert SetupWizard is not None
         except ImportError:
@@ -102,6 +103,7 @@ class TestTUIComponents:
         """Test configuration screen initialization."""
         try:
             from hermes_setup.tui import ConfigScreen
+
             screen = ConfigScreen(config)
             assert screen.config == config
         except ImportError:
@@ -111,6 +113,7 @@ class TestTUIComponents:
         """Test setup wizard steps."""
         try:
             from hermes_setup.tui import SetupWizard
+
             wizard = SetupWizard(config)
             assert wizard.step == 0
             assert len(wizard.steps) == 6
@@ -137,6 +140,7 @@ class TestCLIDebug:
             truncate_string,
             validate_port,
         )
+
         assert callable(is_docker_available)
         assert callable(is_docker_compose_available)
         assert callable(is_port_in_use)
@@ -251,29 +255,26 @@ class TestStateManager:
         """Test deployment history tracking."""
         from hermes_setup.state import StateManager
 
-        with __import__("unittest.mock").patch.object(
-            StateManager, "project_root", tmp_path
-        ):
-            manager = StateManager(config)
-            manager.ensure_directories()
+        manager = StateManager(config)
+        manager.ensure_directories()
 
-            # Initially empty
-            assert len(manager.get_deployment_history()) == 0
+        # Initially empty
+        assert len(manager.get_deployment_history()) == 0
 
-            # Add a record
-            record = manager.save_deployment(
-                image="nousresearch/hermes:latest",
-                action="deploy",
-                notes="initial deploy",
-            )
+        # Add a record
+        record = manager.save_deployment(
+            image="nousresearch/hermes:latest",
+            action="deploy",
+            notes="initial deploy",
+        )
 
-            assert record["image"] == "nousresearch/hermes:latest"
-            assert record["action"] == "deploy"
+        assert record["image"] == "nousresearch/hermes:latest"
+        assert record["action"] == "deploy"
 
-            # Check history
-            history = manager.get_deployment_history()
-            assert len(history) == 1
-            assert history[0] == record
+        # Check history
+        history = manager.get_deployment_history()
+        assert len(history) == 1
+        assert history[0] == record
 
     def test_backup_restore(self, config, tmp_path):
         """Test backup and restore."""
@@ -283,7 +284,7 @@ class TestStateManager:
         manager.ensure_directories()
 
         # Create some test data
-        data_dir = manager.get_data_path()
+        data_dir = manager.config.get_data_path()
         (data_dir / "test_file.txt").write_text("test content")
 
         # Backup

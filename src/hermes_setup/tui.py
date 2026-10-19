@@ -105,7 +105,10 @@ class SetupWizard(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Container(id="wizard-container"):
-            yield Label(f"[bold]Hermes Setup Wizard - Step {self.step + 1}/{len(self.steps)}[/bold]", id="wizard-title")
+            yield Label(
+                f"[bold]Hermes Setup Wizard - Step {self.step + 1}/{len(self.steps)}[/bold]",
+                id="wizard-title",
+            )
             yield Vertical(id="wizard-content")
             yield Horizontal(classes="wizard-buttons")
 
@@ -143,7 +146,9 @@ class SetupWizard(ModalScreen):
         docker_ok = is_docker_available()
         compose_ok = is_docker_compose_available()
         content.mount(Label(f"Docker: {'✓ Available' if docker_ok else '✗ Not available'}"))
-        content.mount(Label(f"Docker Compose: {'✓ Available' if compose_ok else '✗ Not available'}"))
+        content.mount(
+            Label(f"Docker Compose: {'✓ Available' if compose_ok else '✗ Not available'}")
+        )
         if not docker_ok:
             content.mount(Label("[red]Please install Docker before continuing[/red]"))
 
@@ -565,7 +570,7 @@ class HermesSetupApp(App):
         dashboard.update(f"""
 # Hermes Agent Dashboard
 
-**Status:** {status_emoji} {'Running' if status['running'] else 'Stopped'}
+**Status:** {status_emoji} {"Running" if status["running"] else "Stopped"}
 
 **Quick Actions:**
 - Start/Stop/Restart using buttons on the left

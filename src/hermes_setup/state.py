@@ -4,6 +4,7 @@ Handles persistent state across deployments, ensuring that
 agent memory and configurations survive container updates.
 """
 
+import datetime
 import json
 import shutil
 import subprocess
@@ -38,8 +39,6 @@ class StateManager:
         timestamp: str | None = None,
     ) -> dict[str, Any]:
         """Save a deployment record to history."""
-        import datetime
-
         if timestamp is None:
             timestamp = datetime.datetime.now().isoformat()
 
@@ -90,10 +89,20 @@ class StateManager:
         target_backup = self.backup_dir / backup_name
 
         # Copy non-model directories if they exist
+        # Exclude backups dir itself to avoid path nesting issues
+        excluded_dirs = {self.backup_dir, self.history_file.parent}
         for directory in [self.data_dir, self.config.get_models_path()]:
             if not directory.exists():
                 continue
-            shutil.copytree(directory, target_backup / directory.name)
+            dest = target_backup / directory.name
+            for item in directory.iterdir():
+                if item == self.backup_dir:
+                    continue
+                dest_item = dest / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest_item)
+                elif item.is_file():
+                    shutil.copy2(item, dest_item)
 
         # Copy state directory
         if self.state_dir.exists():
@@ -127,9 +136,22 @@ class StateManager:
     def snapshot_volume(self) -> Path | None:
         """Create Docker volume snapshot (requires Docker)."""
         try:
-            result = _run_command(["docker", "run", "--rm", "-v", f"{self.data_dir}:/data",
-                                  "-v", f"{self.backup_dir}:/backup",
-                                  "alpine", "tar", "cfz", "/backup/snapshot.tgz", "/data"])
+            result = _run_command(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{self.data_dir}:/data",
+                    "-v",
+                    f"{self.backup_dir}:/backup",
+                    "alpine",
+                    "tar",
+                    "cfz",
+                    "/backup/snapshot.tgz",
+                    "/data",
+                ]
+            )
             if result.returncode == 0:
                 snapshot = self.backup_dir / "volumesnap.tgz"
                 return snapshot
@@ -164,8 +186,13 @@ class StateManager:
 
     @property
     def has_state(self) -> bool:
-        """Check if there is any existing persistent state."""
-        return any(p.exists() for p in self.get_persistent_state_paths().values())
+        """Check if there is any existing persistent state (files, not just empty dirs)."""
+        for path in [self.state_dir, self.backup_dir, self.history_file]:
+            if path.is_file():
+                return True
+            if path.is_dir() and any(path.iterdir()):
+                return True
+        return False
 
     def generate_state_restore_report(self) -> str:
         """Generate a report of current persistent state."""
@@ -180,8 +207,7 @@ class StateManager:
 
 def _timestamp() -> str:
     """Generate a timestamp string."""
-    import datetime
-    return datetime.datetime.now().strformat(strftime="%Y%m%d_%H%M%S")
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def _run_command(cmd: list) -> subprocess.CompletedProcess:

@@ -195,6 +195,7 @@ networks:
             return {"running": False, "containers": []}
 
         import json
+
         containers = []
         for line in result.stdout.strip().split("\n"):
             if line:
@@ -240,6 +241,7 @@ networks:
 
         # Wait for health check to pass
         import time
+
         for _ in range(30):
             status = self.status(production)
             if status["running"]:
@@ -451,4 +453,3 @@ regexes = [
         self.generate_pre_commit_config()
         self.generate_gitleaks_config()
         self.config.ensure_directories()
-

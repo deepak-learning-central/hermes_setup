@@ -22,9 +22,7 @@ console = Console()
 
 @app.command()
 def init(
-    config_file: Path | None = typer.Option(
-        None, "--config", "-c", help="Path to config file"
-    )
+    config_file: Path | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ) -> None:
     """Initialize Hermes agent setup project."""
     orchestrator = DockerOrchestrator()
@@ -51,9 +49,7 @@ def up(
     production: bool = typer.Option(
         False, "--production", "-p", help="Deploy to production environment"
     ),
-    pull: bool = typer.Option(
-        True, "--pull/--no-pull", help="Pull latest image"
-    ),
+    pull: bool = typer.Option(True, "--pull/--no-pull", help="Pull latest image"),
 ) -> None:
     """Start Hermes agent containers."""
     config = load_config()
@@ -82,12 +78,8 @@ def up(
 
 @app.command()
 def down(
-    production: bool = typer.Option(
-        False, "--production", "-p", help="Stop production containers"
-    ),
-    volumes: bool = typer.Option(
-        False, "--volumes", "-v", help="Remove volumes"
-    ),
+    production: bool = typer.Option(False, "--production", "-p", help="Stop production containers"),
+    volumes: bool = typer.Option(False, "--volumes", "-v", help="Remove volumes"),
 ) -> None:
     """Stop Hermes agent containers."""
     config = load_config()
@@ -105,7 +97,7 @@ def down(
 def restart_cmd(
     production: bool = typer.Option(
         False, "--production", "-p", help="Restart production containers"
-    )
+    ),
 ) -> None:
     """Restart Hermes agent containers."""
     config = load_config()
@@ -163,7 +155,7 @@ def logs(
 def update(
     production: bool = typer.Option(
         False, "--production", "-p", help="Update production deployment"
-    )
+    ),
 ) -> None:
     """Update Hermes agent to latest image."""
     config = load_config()
@@ -206,9 +198,7 @@ def config(
 
 
 @app.command()
-def backup(
-    reason: str = typer.Option("manual", "--reason", "-r", help="Backup reason")
-) -> None:
+def backup(reason: str = typer.Option("manual", "--reason", "-r", help="Backup reason")) -> None:
     """Create state backup."""
     config = load_config()
     state_manager = StateManager(config)
@@ -220,7 +210,7 @@ def backup(
 
 @app.command()
 def restore(
-    backup_path: Path | None = typer.Option(None, "--path", "-p", help="Backup path")
+    backup_path: Path | None = typer.Option(None, "--path", "-p", help="Backup path"),
 ) -> None:
     """Restore from backup."""
     config = load_config()
@@ -248,13 +238,15 @@ def diagnose() -> None:
     table.add_column("Tool", style="bold")
     table.add_column("Status")
     table.add_row("Docker", "✓ Available" if is_docker_available() else "✗ Not available")
-    table.add_row("Docker Compose", "✓ Available" if is_docker_compose_available() else "✗ Not available")
+    table.add_row(
+        "Docker Compose", "✓ Available" if is_docker_compose_available() else "✗ Not available"
+    )
     console.print(table)
 
 
 @app.command("generate:env-template")
 def generate_env_template(
-    path: Path | None = typer.Option(None, "--path", "-p", help="Output path")
+    path: Path | None = typer.Option(None, "--path", "-p", help="Output path"),
 ) -> None:
     """Generate .env.example template."""
     orchestrator = DockerOrchestrator()
@@ -271,6 +263,7 @@ def tui() -> None:
     # Import here to avoid import errors when CLI is run on systems without TUI dependencies
     try:
         from .tui import launch_tui
+
         launch_tui()
     except ImportError as e:
         console.print(f"[red]TUI not available: {e}[/red]")

@@ -104,7 +104,12 @@ def read_env_file(filepath: Path) -> dict[str, str]:
             key = key.strip()
             value = value.strip()
             # Remove quotes if present
-            if value.startswith('"') and value.endswith('"') or value.startswith("'") and value.endswith("'"):
+            if (
+                value.startswith('"')
+                and value.endswith('"')
+                or value.startswith("'")
+                and value.endswith("'")
+            ):
                 value = value[1:-1]
             env_vars[key] = value
     return env_vars
