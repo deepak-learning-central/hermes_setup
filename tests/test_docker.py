@@ -91,7 +91,7 @@ class TestDockerOrchestrator:
         content = orchestrator.generate_compose_file()
         assert "version: '3.8'" in content
         assert "hermes:" in content
-        assert "nousresearch/hermes:latest" in content
+        assert "nousresearch/hermes-agent:latest" in content
         assert "8080:8080" in content  # test ports
         assert f"{orchestrator.config.get_data_path()}:/app/data" in content
         assert f"{orchestrator.config.get_models_path()}:/app/models" in content
@@ -110,7 +110,7 @@ class TestDockerOrchestrator:
         mock_run.return_value.returncode = 0
         assert orchestrator.pull_image() is True
         mock_run.assert_called_once_with(
-            ["docker", "pull", "nousresearch/hermes:latest"],
+            ["docker", "pull", "nousresearch/hermes-agent:latest"],
             capture_output=True,
             text=True,
             timeout=300,

@@ -9,22 +9,25 @@ services:
     container_name: hermes-agent
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${HERMES_HOST_PORT:-8000}:${HERMES_CONTAINER_PORT:-8000}"
     environment:
-      - MODEL_NAME=NousResearch/Hermes-3-Llama-3.1-8B
-      - CONTEXT_SIZE=8192
-      - TEMPERATURE=0.7
-      - TOP_P=0.9
-      - MAX_TOKENS=2048
-      - LOG_LEVEL=INFO
+      - MODEL_NAME=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
+      - CONTEXT_SIZE=${HERMES_CONTEXT_SIZE:-8192}
+      - TEMPERATURE=${HERMES_TEMPERATURE:-0.7}
+      - TOP_P=${HERMES_TOP_P:-0.9}
+      - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
+      - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
+      - HERMES_HF_TOKEN=${HERMES_HF_TOKEN:-}
+      - HERMES_OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
+      - API_PROVIDER=${API_PROVIDER:-huggingface}
     volumes:
       - ../data:/app/data
       - ../models:/app/models
     deploy:
       resources:
         limits:
-          memory: 4g
-          cpus: '2.0'
+          memory: ${HERMES_MEMORY_LIMIT:-4g}
+          cpus: '${HERMES_CPUS_LIMIT:-2.0}'
         reservations:
           memory: 2g
           cpus: '1.0'

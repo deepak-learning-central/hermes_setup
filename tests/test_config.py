@@ -14,7 +14,7 @@ class TestHermesConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = HermesConfig()
-        assert config.docker_image == "nousresearch/hermes:latest"
+        assert config.docker_image == "nousresearch/hermes-agent:latest"
         assert config.host_port == 8000
         assert config.container_port == 8000
         assert config.memory_limit == "4g"

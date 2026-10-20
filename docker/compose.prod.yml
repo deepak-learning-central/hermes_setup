@@ -14,6 +14,9 @@ services:
       - TOP_P=${HERMES_TOP_P:-0.9}
       - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
       - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
+      - HERMES_HF_TOKEN=${HERMES_HF_TOKEN:-}
+      - HERMES_OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
+      - API_PROVIDER=${API_PROVIDER:-ollama}
     volumes:
       - ${HERMES_DATA_DIR:-../data}:/app/data
       - ${HERMES_MODELS_DIR:-../models}:/app/models

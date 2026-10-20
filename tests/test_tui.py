@@ -263,12 +263,12 @@ class TestStateManager:
 
         # Add a record
         record = manager.save_deployment(
-            image="nousresearch/hermes:latest",
+            image="nousresearch/hermes-agent:latest",
             action="deploy",
             notes="initial deploy",
         )
 
-        assert record["image"] == "nousresearch/hermes:latest"
+        assert record["image"] == "nousresearch/hermes-agent:latest"
         assert record["action"] == "deploy"
 
         # Check history
