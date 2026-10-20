@@ -65,6 +65,12 @@ warn_redundant_casts = true
 disallow_untyped_defs = true
 mypy_path = ["src"]
 
+[tool.ruff.format]
+# .gitleaks.toml must keep single-quoted strings: TOML literal strings are the
+# only valid way to express regex backslash escapes like \. — ruff's formatter
+# would convert them to double-quoted (escaped) strings, breaking TOML parsing.
+exclude = [".gitleaks.toml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

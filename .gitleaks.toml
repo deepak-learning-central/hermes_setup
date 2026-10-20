@@ -4,19 +4,18 @@
 [allowlist]
 description = "Allowlisted patterns for Hermes Setup"
 paths = [
-    "(?i).*\.example$",
-    "(?i).*\.template$",
-    "(?i)README\.md$",
-    "(?i)CHANGELOG\.md$",
-    "(?i)LICENSE$",
-    "(?i)\.gitleaks\.toml$",
-    "(?i)\.secrets\.baseline$",
-    "(?i)test.*\.py$",
+    '(?i).*\.example$',
+    '(?i).*\.template$',
+    '(?i)README\.md$',
+    '(?i)CHANGELOG\.md$',
+    '(?i)LICENSE$',
+    '(?i)\.gitleaks\.toml$',
+    '(?i)\.secrets\.baseline$',
+    '(?i)test.*\.py$',
 ]
 
 # Common patterns that are false positives
 regexes = [
-    # UUIDs that look like API keys but aren't
     "example_[a-f0-9]{32}",
     "test_[a-f0-9]{32}",
     "dummy_[a-f0-9]{32}",
