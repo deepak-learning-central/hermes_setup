@@ -28,7 +28,10 @@ class SecretsManager:
                 f"Value for {key} is very long ({len(value)} chars), might contain embedded secrets",
             ),
             # Common placeholder values
-            (r"^(sk_live|sk_test|pk_live|pk_test)", f"Testing/production API key detected in {key}"),
+            (
+                r"^(sk_live|sk_test|pk_live|pk_test)",
+                f"Testing/production API key detected in {key}",
+            ),
             # Base64 encoded values that look suspicious
             (r"^[A-Za-z0-9+/]{40,}={0,2}$", f"Base64-encoded value in {key}"),
         ]
