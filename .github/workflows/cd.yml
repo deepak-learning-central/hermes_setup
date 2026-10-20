@@ -89,7 +89,7 @@ jobs:
           HERMES_DOCKER_IMAGE: hermes-setup:cd
         run: |
           echo "Deploying to production with zero-downtime..."
-          docker compose -f docker/compose.prod.yml up -d --pull always --force-recreate --no-deps
+          docker compose -f docker/compose.prod.yml up -d --pull never --force-recreate --no-deps
           sleep 30
           curl -f http://localhost:8000/health || {
             echo "Production deployment failed - rolling back..."
