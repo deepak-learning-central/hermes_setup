@@ -8,6 +8,7 @@ Portable, credential-free setup for deploying the [Hermes agent](https://hermes-
 
 - **Docker-based deployment** - Runs Hermes agent in isolated containers
 - **Zero-credential repository** - No secrets in git history
+- **Web-based UI configuration** - Browser-based setup with encrypted config storage
 - **Terminal User Interface (TUI)** - Easy management via text-based interface
 - **CI/CD pipeline** - Automated testing, building, and deployment
 - **Zero-downtime updates** - Updates without service interruption
@@ -36,12 +37,11 @@ uv sync
 # Initialize project (creates config files)
 hermes-setup init
 
-# Copy template and configure
-cp .env.example .env
-# Edit .env to set your preferences
+# Launch the web setup UI
+hermes-setup web
 
-# Start Hermes agent
-hermes-setup up
+# Or launch the TUI
+hermes-setup tui
 ```
 
 ## Usage
@@ -64,13 +64,36 @@ hermes-setup logs --follow
 # Update to latest version
 hermes-setup update
 
-# Launch the TUI
+# Launch the Terminal User Interface
 hermes-setup tui
+
+# Launch the Web-based setup UI
+hermes-setup web
 ```
+
+### Web Setup UI
+
+The web UI runs a local FastAPI backend on `http://127.0.0.1:8765` and serves a browser-based configuration page. It is the recommended way to configure and start Hermes for novice users.
+
+```bash
+# Start the web server
+hermes-setup web
+
+# Custom host/port
+hermes-setup web --host 0.0.0.0 --port 8765
+```
+
+**Capabilities:**
+
+- **Configuration** — Set all Hermes agent values (image, ports, resource limits, model name, context size, temperature, etc.)
+- **Encrypted persistence** — Configuration is saved to `.hermes-config.enc` on your local machine, encrypted with a passphrase you supply. This file is **never committed to the repository**
+- **Docker control** — Start, stop, restart, and view container logs
+- **State management** — Create and restore backups of persistent state
+- **Project init** — Generate compose files, `.env.example`, `.gitignore`, and security hooks
 
 ### TUI Interface
 
-The TUI provides an interactive interface for managing your Hermes agent:
+The Textual-based terminal UI provides the same management capabilities from the command line:
 
 - **Dashboard**: Real-time status and quick actions
 - **Configuration**: Modify agent settings
@@ -117,6 +140,7 @@ The project includes GitHub Actions workflows for continuous integration and dep
 ## Security
 
 - **No secrets in repository**: All sensitive values must be in `.env` (gitignored)
+- **Encrypted UI config**: `.hermes-config.enc` holds web UI configuration, encrypted with your passphrase — never committed
 - **Pre-commit hooks**: Prevent accidental secret commits
 - **CI secret scanning**: Fails builds if secrets are detected
 - **Environment isolation**: Secrets loaded only at runtime
@@ -164,6 +188,14 @@ hermes-setup/
 │       ├── __main__.py     # CLI entrypoint
 │       ├── cli.py          # Typer-based CLI
 │       ├── tui.py          # Textual-based terminal interface
+│       ├── web/            # Web-based UI (FastAPI + HTMX)
+│       │   ├── __init__.py
+│       │   ├── backend.py  # FastAPI server + REST endpoints
+│       │   ├── config_manager.py  # Encrypted config persistence
+│       │   ├── service.py  # Wraps Docker/State/Config
+│       │   ├── tabs.py     # HTMX tab fragments
+│       │   └── static/     # HTML, CSS, JS assets
+│       │       └── index.html
 │       ├── config.py       # Pydantic settings management
 │       ├── docker.py       # Docker Compose orchestration
 │       ├── secrets.py      # Secrets validation and injection helpers
@@ -173,7 +205,8 @@ hermes-setup/
 │   ├── __init__.py
 │   ├── test_config.py
 │   ├── test_docker.py
-│   └── test_tui.py
+│   ├── test_tui.py
+│   └── test_config_manager.py
 ├── docker/
 │   ├── Dockerfile          # Hermes agent Docker image
 │   ├── compose.yml         # Development Docker compose
