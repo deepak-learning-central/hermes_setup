@@ -70,11 +70,15 @@ class SetupSession:
         self.manager = EncryptedConfigManager(config_path)
         self.service = SetupService()
         self.passphrase: str | None = None
+        #: True once a config has actually been decrypted (or saved) in this
+        #: session.  A failed load attempt must not count — otherwise the
+        #: frontend would restore a config that was never opened.
+        self.config_loaded = False
 
     def set_passphrase(self, passphrase: str) -> None:
         """Store the passphrase and attach it to the config manager."""
         self.passphrase = passphrase
-        self.manager.passphrase = passphrase
+        self.manager.set_passphrase(passphrase)
 
     def refresh_service(self) -> None:
         """Reload config from disk into the service."""
@@ -82,6 +86,7 @@ class SetupSession:
         if loaded is not None:
             self.service.config = loaded
             self.service.orchestrator = type(self.service.orchestrator)(loaded)
+            self.config_loaded = True
 
 
 session = SetupSession()
@@ -89,10 +94,16 @@ session = SetupSession()
 
 @app.on_event("startup")
 async def _startup() -> None:
-    """Best-effort load of an existing config on startup."""
+    """Best-effort load of an existing config on startup.
+
+    The encrypted file cannot be read without the user's passphrase, so this
+    normally finds nothing.  It must not raise — the server has to come up
+    so the user can be prompted for the passphrase.
+    """
     loaded = session.manager.load()
     if loaded is not None:
         session.service.config = loaded
+        session.config_loaded = True
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +117,7 @@ async def config_save(request: ConfigSaveRequest) -> JSONResponse:
     session.set_passphrase(request.passphrase)
     session.service.apply_config(request.config)
     session.manager.save(session.service.config)
+    session.config_loaded = True
     # Regenerate compose files so docker compose up uses the saved values
     session.service.orchestrator.write_compose_files()
     return JSONResponse({"ok": True, "path": str(session.manager.filepath), "exists": True})
@@ -117,21 +129,45 @@ async def config_load(request: ConfigLoadRequest) -> JSONResponse:
     session.set_passphrase(request.passphrase)
     loaded = session.manager.load()
     if loaded is None:
+        # The passphrase did not open the file — leave the session marked as
+        # "not loaded" so the form is not repopulated with stale defaults.
+        session.config_loaded = False
         raise HTTPException(
             status_code=404, detail="No readable encrypted config found (wrong passphrase?)"
         )
     session.service.config = loaded
+    session.config_loaded = True
     return JSONResponse({"ok": True, "config": session.manager.config_to_dict(loaded)})
+
+
+@app.get("/config/current")
+async def config_current() -> JSONResponse:
+    """Return the config the server currently holds in memory.
+
+    Used to restore the form after the passphrase has been entered once in
+    this session, so the fields show the saved values rather than defaults.
+    """
+    if not session.config_loaded:
+        raise HTTPException(status_code=404, detail="No config loaded in this session")
+    return JSONResponse(
+        {"ok": True, "config": session.manager.config_to_dict(session.service.config)}
+    )
 
 
 @app.get("/config/status")
 async def config_status() -> JSONResponse:
-    """Report whether an encrypted config file exists (without decrypting it)."""
+    """Report whether the encrypted config file exists (without decrypting it).
+
+    Also reports whether a config has already been opened in this session, so
+    the frontend can restore the form right away instead of leaving it at
+    its defaults.
+    """
     return JSONResponse(
         {
             "ok": True,
             "exists": session.manager.exists(),
             "path": str(session.manager.filepath),
+            "alreadyLoaded": session.config_loaded,
         }
     )
 

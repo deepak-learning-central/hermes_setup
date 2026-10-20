@@ -57,22 +57,39 @@ def test_missing_file_returns_none(tmp_path: Path) -> None:
     assert manager.exists() is False
 
 
-def test_config_to_dict_uses_env_var_names(config_file: Path) -> None:
-    """Exported keys should be env var names, not field names."""
+def test_config_to_dict_uses_field_names(config_file: Path) -> None:
+    """Exported keys should be config field names, matching the web UI form."""
     manager = EncryptedConfigManager(config_file, passphrase="x")
     data = manager.config_to_dict(HermesConfig(api_port=1234))
+    assert data["api_port"] == 1234
+    assert "HERMES_API_PORT" not in data
+
+
+def test_config_to_env_dict_uses_env_var_names(config_file: Path) -> None:
+    """The encrypted file payload should use canonical env var names."""
+    manager = EncryptedConfigManager(config_file, passphrase="x")
+    data = manager.config_to_env_dict(HermesConfig(api_port=1234))
     assert data["HERMES_API_PORT"] == 1234
     assert "api_port" not in data
 
 
 def test_dict_to_config_roundtrip(config_file: Path) -> None:
-    """A flat env dict should rebuild an equivalent config."""
+    """A flat dict should rebuild an equivalent config."""
     manager = EncryptedConfigManager(config_file, passphrase="x")
     original = HermesConfig(api_port=7000, log_level="DEBUG")
     restored = manager.dict_to_config(manager.config_to_dict(original))
 
     assert restored.api_port == 7000
     assert restored.log_level == "DEBUG"
+
+
+def test_dict_to_config_accepts_env_var_keys(config_file: Path) -> None:
+    """Env var names (as stored in the encrypted file) should also load."""
+    manager = EncryptedConfigManager(config_file, passphrase="x")
+    restored = manager.dict_to_config({"HERMES_API_PORT": 7001, "HERMES_LOG_LEVEL": "INFO"})
+
+    assert restored.api_port == 7001
+    assert restored.log_level == "INFO"
 
 
 def test_payload_is_valid_json_when_decrypted(config_file: Path) -> None:
@@ -85,6 +102,20 @@ def test_payload_is_valid_json_when_decrypted(config_file: Path) -> None:
     key = Fernet(manager._derive_key("pw"))
     payload = key.decrypt(config_file.read_bytes()).decode()
     assert json.loads(payload)["HERMES_API_PORT"] == 8080
+
+
+def test_set_passphrase_invalidates_the_cached_cipher(config_file: Path) -> None:
+    """A new passphrase must not reuse the previous one's cipher.
+
+    Without invalidating the cached Fernet instance, a wrong passphrase
+    typed after a correct one would still decrypt the file.
+    """
+    manager = EncryptedConfigManager(config_file, passphrase="right")
+    manager.save(HermesConfig(api_port=1234))
+    assert manager.load() is not None
+
+    manager.set_passphrase("wrong")
+    assert manager.load() is None
 
 
 def test_remove_deletes_file(config_file: Path) -> None:

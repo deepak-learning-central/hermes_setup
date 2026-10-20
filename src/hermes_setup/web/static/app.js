@@ -201,17 +201,19 @@ function saveConfig() {
     });
 }
 
-function loadConfig() {
+function loadConfig(silent) {
     var loadBtn = document.getElementById('btn-load-config');
     var result = document.getElementById('config-result');
     var passphraseEl = document.getElementById('load-passphrase');
     var passphrase = passphraseEl ? passphraseEl.value : '';
     if (!passphrase) {
-        setResult(result, 'Please enter passphrase to load', false);
+        if (!silent) setResult(result, 'Please enter passphrase to load', false);
         return;
     }
-    loadBtn.disabled = true;
-    loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Loading...';
+    if (loadBtn) {
+        loadBtn.disabled = true;
+        loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Loading...';
+    }
     fetch('/config/load', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -225,13 +227,19 @@ function loadConfig() {
             var section = document.getElementById('load-section');
             if (section) section.style.display = 'none';
         } else {
-            setResult(result, 'Load failed: ' + (data.detail || 'wrong passphrase?'), false);
+            if (!silent) {
+                setResult(result, 'Load failed: ' + (data.detail || 'wrong passphrase?'), false);
+            }
         }
     })
-    .catch(function (e) { setResult(result, 'Load failed: ' + e.message, false); })
+    .catch(function (e) {
+        if (!silent) setResult(result, 'Load failed: ' + e.message, false);
+    })
     .finally(function () {
-        loadBtn.disabled = false;
-        loadBtn.innerHTML = '<i class="fas fa-folder-open mr-2"></i> Load Config';
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.innerHTML = '<i class="fas fa-folder-open mr-2"></i> Load Config';
+        }
     });
 }
 
@@ -265,19 +273,59 @@ function bindTab() {
         loadBtn.addEventListener('click', loadConfig);
     }
 
+    // Load the saved config as soon as the user enters a passphrase, so the
+    // form does not show stale defaults when there is one to restore.
+    // The input is rebuilt on each HTMX tab swap, so binding it here is
+    // safe — each new element gets its own single handler.
+    var passphraseEl = document.getElementById('load-passphrase');
+    if (passphraseEl) {
+        passphraseEl.addEventListener('change', function () {
+            loadConfig(true);
+        });
+        passphraseEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loadConfig(false);
+            }
+        });
+        // If we already know the passphrase from earlier in this session,
+        // restore the config straight away.
+        if (passphraseEl.value) loadConfig(true);
+    }
+
     refreshStatus();
     refreshContainerStatus();
 
-    // Reveal the "load existing config" block if a config file exists.
+    // Reveal the "load existing config" block if a config file exists, and
+    // restore the already-loaded config when the session knows the passphrase.
     var loadSection = document.getElementById('load-section');
     if (loadSection) {
         fetch('/config/status')
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (d.ok && d.exists) loadSection.style.display = 'block';
+                if (!d.ok) return;
+                if (d.alreadyLoaded) {
+                    // Already opened in this session — no need to ask again.
+                    loadSection.style.display = 'none';
+                    restoreLoadedConfig();
+                } else if (d.exists) {
+                    loadSection.style.display = 'block';
+                }
             })
             .catch(function () { /* ignore */ });
     }
+}
+
+// Restores the config the server already has in memory (the passphrase was
+// entered earlier in this session), so the form shows the real values
+// instead of the defaults.
+function restoreLoadedConfig() {
+    fetch('/config/current')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.ok && d.config) populateConfig(d.config);
+        })
+        .catch(function () { /* ignore */ });
 }
 
 // ----------------------------------------------------------------

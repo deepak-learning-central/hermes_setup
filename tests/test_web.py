@@ -97,6 +97,83 @@ def client() -> TestClient:
     return TestClient(app)
 
 
+class TestConfigEndpoints:
+    """The config endpoints back the "load existing config" flow."""
+
+    def test_status_reports_whether_a_file_exists(self, client: TestClient):
+        """GET /config/status reports existence without decrypting anything."""
+        response = client.get("/config/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ok"] is True
+        assert "exists" in data
+        assert "alreadyLoaded" in data
+
+    def test_current_returns_404_without_a_passphrase(self, client: TestClient):
+        """GET /config/current should 404 when no config is loaded."""
+        from hermes_setup.web import backend
+
+        original = backend.session.config_loaded
+        backend.session.config_loaded = False
+        try:
+            response = client.get("/config/current")
+            assert response.status_code == 404
+        finally:
+            backend.session.config_loaded = original
+
+    def test_current_returns_field_named_config(self, client: TestClient):
+        """GET /config/current must key its payload by config field name.
+
+        The frontend looks up ``config[field]`` by field name, so env var
+        names here would leave the form showing its defaults.
+        """
+        from hermes_setup.web import backend
+
+        original = backend.session.config_loaded
+        backend.session.config_loaded = True
+        try:
+            response = client.get("/config/current")
+            assert response.status_code == 200
+            config = response.json()["config"]
+            assert "api_port" in config
+            assert "HERMES_API_PORT" not in config
+        finally:
+            backend.session.config_loaded = original
+
+    def test_failed_load_does_not_mark_the_session_as_loaded(self, client: TestClient):
+        """A wrong passphrase must not leave the session marked as loaded."""
+        from hermes_setup.web import backend
+
+        original = backend.session.config_loaded
+        backend.session.config_loaded = True
+        try:
+            response = client.post("/config/load", json={"passphrase": "definitely-wrong"})
+            assert response.status_code == 404
+            assert backend.session.config_loaded is False
+        finally:
+            backend.session.config_loaded = original
+
+    def test_startup_does_not_crash_without_a_passphrase(self, tmp_path, monkeypatch):
+        """The server must start even when an encrypted config exists.
+
+        The file cannot be decrypted until the user supplies a passphrase,
+        so the startup load must not raise.
+        """
+        from hermes_setup.web import backend
+
+        config_path = tmp_path / ".hermes-config.enc"
+        manager = backend.EncryptedConfigManager(config_path, passphrase="pw")
+        manager.save(backend.session.service.config)
+        # The user has not entered a passphrase yet, so the file is undecryptable.
+        manager.passphrase = None
+
+        monkeypatch.setattr(backend.session, "manager", manager)
+        monkeypatch.setattr(backend.session, "passphrase", None)
+
+        with TestClient(app) as started:
+            assert started.get("/health").status_code == 200
+
+
 class TestHealthEndpoint:
     """The frontend polls /health with HEAD as well as GET."""
 
