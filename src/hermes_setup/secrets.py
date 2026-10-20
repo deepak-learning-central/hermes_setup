@@ -4,11 +4,9 @@ Provides secure handling and validation of environment variables
 containing sensitive information.
 """
 
-import hashlib
-import os
-import subprocess
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .config import HermesConfig
 
@@ -16,25 +14,26 @@ from .config import HermesConfig
 class SecretsManager:
     """Manages secrets for Hermes agent setup."""
 
-    def __init__(self, config: Optional[HermesConfig] = None):
+    def __init__(self, config: HermesConfig | None = None):
         self.config = config or HermesConfig()
         self.project_root = Path.cwd()
 
-    def validate_env_value(self, key: str, value: str) -> Tuple[bool, Optional[str]]:
+    def validate_env_value(self, key: str, value: str) -> tuple[bool, str | None]:
         """Validate an environment variable value for secrets."""
         # Check for common secret patterns in values
         secret_patterns = [
             # Hardcoded API keys - very long strings
-            (r'.{200,}', f"Value for {key} is very long ({len(value)} chars), "
-                         "might contain embedded secrets"),
+            (
+                r".{200,}",
+                f"Value for {key} is very long ({len(value)} chars), might contain embedded secrets",
+            ),
             # Common placeholder values
-            (r'^(sk_live|sk_test|pk_live|pk_test)', f"Testing/production API key detected in {key}"),
+            (r"^(sk_live|sk_test|pk_live|pk_test)", f"Testing/production API key detected in {key}"),
             # Base64 encoded values that look suspicious
-            (r'^[A-Za-z0-9+/]{40,}={0,2}$', f"Base64-encoded value in {key}"),
+            (r"^[A-Za-z0-9+/]{40,}={0,2}$", f"Base64-encoded value in {key}"),
         ]
 
         for pattern, message in secret_patterns:
-            import re
             if re.match(pattern, value):
                 return False, message
 
@@ -44,11 +43,9 @@ class SecretsManager:
 
         return True, None
 
-    def detect_secrets(self, content: str) -> List[Dict[str, Any]]:
+    def detect_secrets(self, content: str) -> list[dict[str, Any]]:
         """Detect potential secrets in file content."""
-        import re
-
-        findings: List[Dict[str, Any]] = []
+        findings: list[dict[str, Any]] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -66,11 +63,25 @@ class SecretsManager:
 
                 # Skip common non-secret keys
                 non_secret_keys = {
-                    "HERMES_", "MODEL_", "CONTEXT_", "TEMPERATURE_",
-                    "TOP_P_", "MAX_TOKENS_", "LOG_", "DATA_", "MODELS_",
-                    "PORT_", "HOST_", "CONTAINER_", "NETWORK_",
-                    "VOLUME_", "NETWORK_", "SERVICE_", "VERSION_",
-                    "IMAGE_", "RESTART_", "HEALTHCHECK_",
+                    "HERMES_",
+                    "MODEL_",
+                    "CONTEXT_",
+                    "TEMPERATURE_",
+                    "TOP_P_",
+                    "MAX_TOKENS_",
+                    "LOG_",
+                    "DATA_",
+                    "MODELS_",
+                    "PORT_",
+                    "HOST_",
+                    "CONTAINER_",
+                    "NETWORK_",
+                    "VOLUME_",
+                    "SERVICE_",
+                    "VERSION_",
+                    "IMAGE_",
+                    "RESTART_",
+                    "HEALTHCHECK_",
                 }
 
                 if any(key.startswith(prefix) for prefix in non_secret_keys):
@@ -78,19 +89,21 @@ class SecretsManager:
 
                 # Check for potential secrets (long strings, base64, etc.)
                 if len(val) > 100:
-                    findings.append({
-                        "line": i,
-                        "key": key,
-                        "value_length": len(val),
-                        "issue": f"Potential secret value (length {len(val)}) for {key}",
-                    })
+                    findings.append(
+                        {
+                            "line": i,
+                            "key": key,
+                            "value_length": len(val),
+                            "issue": f"Potential secret value (length {len(val)}) for {key}",
+                        }
+                    )
 
         return findings
 
-    def scan_directory(self, directory: Optional[Path] = None) -> List[Dict[str, Any]]:
+    def scan_directory(self, directory: Path | None = None) -> list[dict[str, Any]]:
         """Scan a directory for potential secret leaks."""
         target = directory or self.project_root
-        findings: List[Dict[str, Any]] = []
+        findings: list[dict[str, Any]] = []
 
         if not target.exists():
             return findings
@@ -119,7 +132,7 @@ class SecretsManager:
 
         return findings
 
-    def generate_env_template(self, path: Optional[Path] = None) -> str:
+    def generate_env_template(self, path: Path | None = None) -> str:
         """Generate .env.example with proper guidance."""
         config = self.config
 
@@ -193,7 +206,7 @@ HERMES_LOG_LEVEL={config.log_level}
 
         return template
 
-    def generate_safe_env_example(self, path: Optional[Path] = None) -> str:
+    def generate_safe_env_example(self, path: Path | None = None) -> str:
         """Generate a .env.example with security warnings."""
         safe_example = """# !!! SECURITY WARNING !!!
 # Never commit .env files containing real secrets to version control!
@@ -256,9 +269,9 @@ HERMES_LOG_LEVEL=INFO
         return safe_example
 
     @staticmethod
-    def create_baseline() -> Dict[str, Any]:
+    def create_baseline() -> dict[str, Any]:
         """Create a secrets baseline file for detect-secrets."""
-        baseline: Dict[str, Any] = {
+        baseline: dict[str, Any] = {
             "version": 1,
             "default_excludes": True,
             "baseline": [],
