@@ -6,12 +6,13 @@ A portable, credential-free setup for deploying the Hermes agent
 
 __version__ = "0.1.0"
 
+from .cli import main
 from .config import HermesConfig
 from .docker import DockerOrchestrator
 from .secrets import SecretsManager
 from .state import StateManager
 
-__all__ = ["HermesConfig", "DockerOrchestrator", "SecretsManager", "StateManager"]
+__all__ = ["HermesConfig", "DockerOrchestrator", "SecretsManager", "StateManager", "main"]
 
 # ---------------------------------------------------------------------------
 # TODO: SSH-based production deployment

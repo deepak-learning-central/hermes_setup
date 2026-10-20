@@ -16,6 +16,7 @@ paths = [
 
 # Common patterns that are false positives
 regexes = [
+    # UUIDs that look like API keys but aren't
     "example_[a-f0-9]{32}",
     "test_[a-f0-9]{32}",
     "dummy_[a-f0-9]{32}",

@@ -518,11 +518,9 @@ class HermesSetupApp(App[Any]):
                     yield Button("Start", id="btn-start", variant="success")
                     yield Button("Stop", id="btn-stop", variant="error")
                     yield Button("Restart", id="btn-restart", variant="primary")
-            with Vertical(id="content"):
-                yield TabbedContent(
-                    TabPane("Dashboard", Markdown(id="dashboard-content")),  # type: ignore[arg-type]
-                    TabPane("Logs", Log(id="main-log-viewer")),  # type: ignore[arg-type]
-                )
+            with Vertical(id="content"), TabbedContent():
+                yield TabPane("Dashboard", Markdown(id="dashboard-content"))
+                yield TabPane("Logs", Log(id="main-log-viewer"))
         yield Footer()
 
     def on_mount(self) -> None:
