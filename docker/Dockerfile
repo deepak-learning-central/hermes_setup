@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:0.13.3 /uv /uvx /bin/
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --version 0.5.0
+ENV PATH="/root/.local/bin:$PATH"
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
@@ -45,9 +46,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r hermes -g 1000 \
     && useradd -r -g hermes -u 1000 -m -d /app hermes
-
-# Copy uv from builder
-COPY --from=builder /uv /uvx /bin/
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
