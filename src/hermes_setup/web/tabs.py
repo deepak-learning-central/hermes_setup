@@ -105,7 +105,7 @@ def config() -> str:
     </p>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- String fields -->
+      <!-- Docker Settings -->
       <div class="flex flex-col">
         <label class="text-sm font-medium text-gray-700 mb-1">Docker Image</label>
         <input id="docker_image" type="text" value="nousresearch/hermes-agent:latest" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
@@ -126,6 +126,7 @@ def config() -> str:
         <label class="text-sm font-medium text-gray-700 mb-1">CPU Limit</label>
         <input id="cpus_limit" type="number" step="0.5" value="2" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
       </div>
+      <!-- Data Paths -->
       <div class="flex flex-col">
         <label class="text-sm font-medium text-gray-700 mb-1">Data Directory</label>
         <input id="data_dir" type="text" value="./data" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
@@ -134,6 +135,7 @@ def config() -> str:
         <label class="text-sm font-medium text-gray-700 mb-1">Models Directory</label>
         <input id="models_dir" type="text" value="./models" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
       </div>
+      <!-- Hermes Agent Settings -->
       <div class="flex flex-col">
         <label class="text-sm font-medium text-gray-700 mb-1">Model Name</label>
         <input id="model_name" type="text" value="NousResearch/Hermes-3-Llama-3.1-8B" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
@@ -161,6 +163,47 @@ def config() -> str:
       <div class="flex flex-col">
         <label class="text-sm font-medium text-gray-700 mb-1">Max Tokens</label>
         <input id="max_tokens" type="number" value="2048" class="border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+      </div>
+      <!-- API Keys -->
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">HuggingFace Token</label>
+        <input id="hf_token" type="password" placeholder="hf_xxxxxxxxxxxxx (optional)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+        <p class="text-xs text-gray-500 mt-1">Required for private models or HF Inference API</p>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">OpenAI API Key</label>
+        <input id="openai_api_key" type="password" placeholder="sk-xxxxxxxxxxxxx (optional)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">OpenAI Base URL</label>
+        <input id="openai_base_url" type="text" placeholder="https://api.openai.com/v1 (optional)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+        <p class="text-xs text-gray-500 mt-1">For OpenAI-compatible endpoints</p>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Ollama Host</label>
+        <input id="ollama_host" type="text" value="http://host.docker.internal:11434" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+        <p class="text-xs text-gray-500 mt-1">Default for Ollama on Docker Desktop</p>
+      </div>
+      <!-- Channel Tokens -->
+      <div class="md:col-span-2 border-t border-gray-200 pt-4">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Channel Integrations</h3>
+        <p class="text-xs text-gray-500 mb-3">Get tokens from: Telegram @BotFather, Discord Developer Portal, Slack API Apps</p>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Telegram Bot Token</label>
+        <input id="telegram_bot_token" type="password" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Discord Bot Token</label>
+        <input id="discord_bot_token" type="password" placeholder="your_discord_bot_token_here" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Slack Bot Token</label>
+        <input id="slack_bot_token" type="password" placeholder="xoxb-your-slack-bot-token" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Slack App Token</label>
+        <input id="slack_app_token" type="password" placeholder="xapp-1-your-slack-app-token" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
       </div>
     </div>
 

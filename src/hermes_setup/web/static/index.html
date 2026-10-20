@@ -97,6 +97,60 @@
     </footer>
 
     <script>
+        // Config save handler
+        document.addEventListener('DOMContentLoaded', function() {
+            var saveBtn = document.getElementById('btn-save-config');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    var config = {};
+                    var fields = [
+                        'docker_image', 'host_port', 'container_port', 'memory_limit',
+                        'cpus_limit', 'data_dir', 'models_dir', 'model_name',
+                        'api_provider', 'context_size', 'temperature', 'top_p',
+                        'max_tokens', 'hf_token', 'openai_api_key', 'openai_base_url',
+                        'ollama_host', 'telegram_bot_token', 'discord_bot_token',
+                        'slack_bot_token', 'slack_app_token'
+                    ];
+                    fields.forEach(function(f) {
+                        var el = document.getElementById(f);
+                        if (el && el.value) config[f] = el.value;
+                    });
+                    var passphrase = document.getElementById('passphrase').value;
+                    var result = document.getElementById('config-result');
+                    if (!passphrase) {
+                        result.textContent = 'Please enter a passphrase';
+                        result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                        return;
+                    }
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving...';
+                    fetch('/config/save', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({passphrase: passphrase, config: config})
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.ok) {
+                            result.textContent = 'Config saved to ' + data.path;
+                            result.className = 'mt-4 h-6 text-sm font-medium text-green-600';
+                        } else {
+                            result.textContent = 'Save failed';
+                            result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                        }
+                    })
+                    .catch(function() {
+                        result.textContent = 'Save failed';
+                        result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                    })
+                    .finally(function() {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Save Encrypted Config';
+                    });
+                });
+            }
+        });
+
         // Tab switching
         document.addEventListener('htmx:afterSwap', function(evt) {
             // Update active tab button
