@@ -3,7 +3,7 @@ version: '3.8'
 services:
   hermes:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile
     image: hermes-setup:local
     container_name: hermes-agent
@@ -18,8 +18,8 @@ services:
       - MAX_TOKENS=2048
       - LOG_LEVEL=INFO
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - ../data:/app/data
+      - ../models:/app/models
     deploy:
       resources:
         limits:
@@ -29,7 +29,7 @@ services:
           memory: 2g
           cpus: '1.0'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "pgrep", "-f", "python -m hermes_setup.tui"]
       interval: 30s
       timeout: 10s
       retries: 3

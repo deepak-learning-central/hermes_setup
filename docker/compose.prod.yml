@@ -15,8 +15,8 @@ services:
       - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
       - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
     volumes:
-      - ${HERMES_DATA_DIR:-./data}:/app/data
-      - ${HERMES_MODELS_DIR:-./models}:/app/models
+      - ${HERMES_DATA_DIR:-../data}:/app/data
+      - ${HERMES_MODELS_DIR:-../models}:/app/models
     deploy:
       resources:
         limits:
