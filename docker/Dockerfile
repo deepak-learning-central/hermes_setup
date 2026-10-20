@@ -19,8 +19,14 @@ COPY pyproject.toml uv.lock* ./
 # Copy application source (required for uv to build the local package)
 COPY src/ ./src/
 
-# Install dependencies
-RUN uv sync --frozen --no-cache --no-dev
+# Copy README for uv_build
+COPY README.md ./
+
+# Copy Docker Compose files
+COPY docker/ ./docker/
+
+# Copy config
+COPY docker/hermes/ ./config/
 
 # Build stage
 FROM python:3.11-slim AS runtime
