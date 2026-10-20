@@ -121,7 +121,7 @@ services:
           memory: {config.memory_limit}
           cpus: '{config.cpus_limit / 2}'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:{config.container_port}/health"]
+      test: ["CMD", "pgrep", "-f", "python -m hermes_setup.tui"]
       interval: 30s
       timeout: 10s
       retries: 3
