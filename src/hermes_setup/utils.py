@@ -8,7 +8,10 @@ import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from hermes_setup.config import HermesConfig
 
 
 def is_docker_available() -> bool:
@@ -121,6 +124,39 @@ def write_env_file(filepath: Path, env_vars: dict[str, str]) -> None:
     with open(filepath, "w", encoding="utf-8") as f:
         for key, value in sorted(env_vars.items()):
             f.write(f"{key}={value}\n")
+
+
+def sync_config_to_env_file(
+    config: "HermesConfig", filepath: Path, extra_env: dict[str, str] | None = None
+) -> None:
+    """Persist current config state to a .env file, preserving existing entries.
+
+    Args:
+        config: The HermesConfig instance with current values.
+        filepath: Path to .env file.
+        extra_env: Additional env vars to include (e.g., channel tokens passed without HERMES_ prefix).
+    """
+    from hermes_setup.config import env_field_name
+
+    # Load existing .env to preserve comments and unknown vars
+    existing = read_env_file(filepath) if filepath.exists() else {}
+
+    # Build dict of all config fields to persist
+    to_write: dict[str, str] = {}
+
+    for field_name, _field_info in config.model_fields.items():
+        value = getattr(config, field_name)
+        if value is None:
+            continue  # Don't write None values
+        env_key = env_field_name(field_name)
+        to_write[env_key] = str(value)
+
+    # Merge: keep existing unknown keys, override known ones
+    existing.update(to_write)
+    if extra_env:
+        existing.update(extra_env)
+
+    write_env_file(filepath, existing)
 
 
 def merge_env_files(*files: Path) -> dict[str, str]:

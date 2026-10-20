@@ -2,8 +2,44 @@
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Canonical environment variable name for each config field. Most fields use
+# the HERMES_ prefix (matching docker compose), but API_PROVIDER and channel
+# tokens are intentionally unprefixed to match what compose passes through.
+_ENV_FIELD_NAMES = {
+    "docker_image": "HERMES_DOCKER_IMAGE",
+    "docker_compose_file": "HERMES_DOCKER_COMPOSE_FILE",
+    "docker_compose_prod_file": "HERMES_DOCKER_COMPOSE_PROD_FILE",
+    "host_port": "HERMES_HOST_PORT",
+    "container_port": "HERMES_CONTAINER_PORT",
+    "memory_limit": "HERMES_MEMORY_LIMIT",
+    "cpus_limit": "HERMES_CPUS_LIMIT",
+    "data_dir": "HERMES_DATA_DIR",
+    "models_dir": "HERMES_MODELS_DIR",
+    "model_name": "HERMES_MODEL_NAME",
+    "context_size": "HERMES_CONTEXT_SIZE",
+    "temperature": "HERMES_TEMPERATURE",
+    "top_p": "HERMES_TOP_P",
+    "max_tokens": "HERMES_MAX_TOKENS",
+    "hf_token": "HERMES_HF_TOKEN",
+    "openai_api_key": "HERMES_OPENAI_API_KEY",
+    "openai_base_url": "HERMES_OPENAI_BASE_URL",
+    "ollama_host": "HERMES_OLLAMA_HOST",
+    "api_provider": "API_PROVIDER",
+    "telegram_bot_token": "TELEGRAM_BOT_TOKEN",
+    "discord_bot_token": "DISCORD_BOT_TOKEN",
+    "slack_bot_token": "SLACK_BOT_TOKEN",
+    "slack_app_token": "SLACK_APP_TOKEN",
+    "log_level": "HERMES_LOG_LEVEL",
+    "log_file": "HERMES_LOG_FILE",
+}
+
+
+def env_field_name(field_name: str) -> str:
+    """Return the canonical env var name for a config field name."""
+    return _ENV_FIELD_NAMES.get(field_name, f"HERMES_{field_name.upper()}")
 
 
 class HermesConfig(BaseSettings):
@@ -13,6 +49,7 @@ class HermesConfig(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        env_prefix="HERMES_",
         extra="ignore",
     )
 
@@ -116,24 +153,30 @@ class HermesConfig(BaseSettings):
     api_provider: str = Field(
         default="huggingface",
         description="API provider: huggingface | openai | ollama",
+        validation_alias=AliasChoices("HERMES_API_PROVIDER", "API_PROVIDER"),
     )
 
-    # Channel integrations
+    # Channel integrations (use env vars WITHOUT the HERMES_ prefix to match
+    # what Docker Compose passes through from the host environment)
     telegram_bot_token: str | None = Field(
         default=None,
         description="Telegram bot token (from @BotFather)",
+        validation_alias=AliasChoices("HERMES_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"),
     )
     discord_bot_token: str | None = Field(
         default=None,
         description="Discord bot token (from Discord Developer Portal)",
+        validation_alias=AliasChoices("HERMES_DISCORD_BOT_TOKEN", "DISCORD_BOT_TOKEN"),
     )
     slack_bot_token: str | None = Field(
         default=None,
         description="Slack bot token (xoxb-...)",
+        validation_alias=AliasChoices("HERMES_SLACK_BOT_TOKEN", "SLACK_BOT_TOKEN"),
     )
     slack_app_token: str | None = Field(
         default=None,
         description="Slack app token (xapp-1-...)",
+        validation_alias=AliasChoices("HERMES_SLACK_APP_TOKEN", "SLACK_APP_TOKEN"),
     )
 
     # Logging

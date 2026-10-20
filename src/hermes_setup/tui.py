@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -244,6 +245,7 @@ class SetupWizard(ModalScreen[Any]):
     def finish_wizard(self) -> None:
         self.save_current_step()
         self.orchestrator.init_project()
+        self.persist_config()
         self.dismiss(True)
 
     def save_current_step(self) -> None:
@@ -269,6 +271,21 @@ class SetupWizard(ModalScreen[Any]):
                 self.config.hf_token = hf_token
             if openai_key:
                 self.config.openai_api_key = openai_key
+
+    def persist_config(self) -> None:
+        """Persist current config to .env file."""
+        from hermes_setup.utils import sync_config_to_env_file
+        sync_config_to_env_file(self.config, Path.cwd() / ".env")
+
+        # Also persist any channel tokens currently in environment as-is
+        # (in case user set them via shell before running TUI)
+        extra = {
+            k: v
+            for k, v in os.environ.items()
+            if k in ("TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN")
+        }
+        if extra:
+            sync_config_to_env_file(self.config, Path.cwd() / ".env", extra_env=extra)
 
 
 class ConfigScreen(Screen[Any]):
@@ -358,8 +375,10 @@ class ConfigScreen(Screen[Any]):
 
     @on(Button.Pressed, "#save-config")
     def save_config(self) -> None:
-        # In a real implementation, this would persist to .env
-        self.app.notify("Configuration saved (would write to .env in real implementation)")
+        from hermes_setup.utils import sync_config_to_env_file
+        sync_config_to_env_file(self.config, Path.cwd() / ".env")
+        # Channel tokens are already preserved via the wizard's persist_config call
+        self.app.notify("Configuration saved to .env", timeout=3)
         self.app.pop_screen()
 
 
