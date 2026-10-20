@@ -272,6 +272,23 @@ def tui() -> None:
         raise typer.Exit(1)
 
 
+@app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind"),
+    port: int = typer.Option(8765, "--port", "-p", help="Port to bind"),
+) -> None:
+    """Launch the web-based setup server."""
+    try:
+        from .web.backend import run
+
+        run(host=host, port=port)
+    except ImportError as e:
+        console.print(f"[red]Web backend not available: {e}[/red]")
+        console.print("[yellow]Install required dependencies:[/yellow]")
+        console.print("  uv sync")
+        raise typer.Exit(1)
+
+
 def main() -> None:
     """Main entry point."""
     app()

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Setup - Web Configuration</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <header class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                <i class="fas fa-robot text-blue-600 mr-3"></i>
+                Hermes Setup - Web Configuration
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">
+                Configure and manage your Hermes agent via web interface
+            </p>
+        </div>
+    </header>
+
+    <main class="flex-1 flex">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-gray-200">
+            <nav class="space-y-1 p-4">
+                <button
+                    hx-get="/tab/dashboard"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    class="tab-btn flex items-center w-full px-3 py-2 rounded-md text-left text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <i class="fas fa-tachometer-alt mr-3"></i>
+                    Dashboard
+                </button>
+
+                <button
+                    hx-get="/tab/config"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    class="tab-btn flex items-center w-full px-3 py-2 rounded-md text-left text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <i class="fas fa-cog mr-3"></i>
+                    Configuration
+                </button>
+
+                <button
+                    hx-get="/tab/docker"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    class="tab-btn flex items-center w-full px-3 py-2 rounded-md text-left text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <i class="fas fa-whale mr-3"></i>
+                    Docker Control
+                </button>
+
+                <button
+                    hx-get="/tab/state"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    class="tab-btn flex items-center w-full px-3 py-2 rounded-md text-left text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <i class="fas fa-database mr-3"></i>
+                    State Management
+                </button>
+
+                <button
+                    hx-get="/tab/system"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    class="tab-btn flex items-center w-full px-3 py-2 rounded-md text-left text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <i class="fas fa-info-circle mr-3"></i>
+                    System Info
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <section class="flex-1 overflow-y-auto p-6 bg-gray-50" id="tab-content">
+            <!-- Tab content will be loaded here via HTMX -->
+        </section>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
+            Hermes Setup Web Interface •
+            <span id="connection-status" class="animate-pulse inline-flex items-center px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                <i class="fas fa-circle mr-1"></i> Connecting...
+            </span>
+        </div>
+    </footer>
+
+    <script>
+        // Tab switching
+        document.addEventListener('htmx:afterSwap', function(evt) {
+            // Update active tab button
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'text-blue-700', 'font-medium');
+            });
+
+            // Find button that matches current URL
+            const path = window.location.pathname;
+            if (path.startsWith('/tab/')) {
+                const tabName = path.substring(5);
+                const btn = document.querySelector(`[hx-get="/tab/${tabName}"]`);
+                if (btn) {
+                    btn.classList.add('bg-blue-50', 'text-blue-700', 'font-medium');
+                }
+            }
+
+            // Update connection status
+            document.getElementById('connection-status').innerHTML =
+                '<i class="fas fa-circle mr-1"></i> Connected';
+            document.getElementById('connection-status').className =
+                'animate-pulse inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs';
+        });
+
+        // Initial load - show dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Trigger dashboard load
+            htmx.ajax('GET', '/tab/dashboard', {
+                target: document.getElementById('tab-content'),
+                swap: 'innerHTML'
+            });
+
+            // Set dashboard as active tab
+            document.querySelector('[hx-get="/tab/dashboard"]').classList.add('bg-blue-50', 'text-blue-700', 'font-medium');
+        });
+
+        // Connection status monitoring
+        let connectionStatus = true;
+        setInterval(() => {
+            fetch('/health', {method: 'HEAD'})
+                .then(() => {
+                    if (!connectionStatus) {
+                        connectionStatus = true;
+                        document.getElementById('connection-status').innerHTML =
+                            '<i class="fas fa-circle mr-1"></i> Connected';
+                        document.getElementById('connection-status').className =
+                            'animate-pulse inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs';
+                    }
+                })
+                .catch(() => {
+                    if (connectionStatus) {
+                        connectionStatus = false;
+                        document.getElementById('connection-status').innerHTML =
+                            '<i class="fas fa-circle mr-1"></i> Disconnected';
+                        document.getElementById('connection-status').className =
+                            'animate-pulse inline-flex items-center px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs';
+                    }
+                });
+        }, 5000);
+    </script>
+</body>
+</html>

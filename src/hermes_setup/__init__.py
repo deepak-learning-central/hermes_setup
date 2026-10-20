@@ -14,6 +14,14 @@ from .state import StateManager
 
 __all__ = ["HermesConfig", "DockerOrchestrator", "SecretsManager", "StateManager", "main"]
 
+# Web UI backend (imports optional — only loaded when the web command runs)
+try:
+    from .web.backend import app  # noqa: F401
+
+    __all__.append("app")
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # TODO: SSH-based production deployment
 # ---------------------------------------------------------------------------

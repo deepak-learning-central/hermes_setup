@@ -42,6 +42,14 @@ def env_field_name(field_name: str) -> str:
     return _ENV_FIELD_NAMES.get(field_name, f"HERMES_{field_name.upper()}")
 
 
+def field_name_for_env(env_name: str) -> str | None:
+    """Return the config field name for an env var name, or None if unknown."""
+    for field_name, canonical in _ENV_FIELD_NAMES.items():
+        if canonical == env_name:
+            return field_name
+    return None
+
+
 class HermesConfig(BaseSettings):
     """Configuration for Hermes agent deployment."""
 

@@ -12,6 +12,12 @@
 *.pem
 *.key
 
+# Encrypted Hermes config (web UI — never committed)
+.hermes-config.enc
+
+# Backup directory — local snapshot of old implementation
+backup_*/
+
 # Data directories
 data/
 models/
