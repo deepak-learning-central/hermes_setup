@@ -8,12 +8,8 @@
 *.env.production
 
 # Secrets and credentials
-*secret*
-*credential*
-*password*
-*token*
-*key*.pem
-*key*.key
+*.pem
+*.key
 
 # Data directories
 data/
