@@ -41,7 +41,7 @@ def init(
     console.print("\nNext steps:")
     console.print("  1. Copy .env.example to .env and fill in your values")
     console.print("  2. Run: hermes-setup up")
-    console.print("  3. Or launch the TUI: hermes-setup tui")
+    console.print("  3. Or launch the web UI: hermes-setup web")
 
 
 @app.command()
@@ -255,21 +255,6 @@ def generate_env_template(
         console.print(f"[green]Generated: {path}[/green]")
     else:
         console.print("[green]Generated: .env.example[/green]")
-
-
-@app.command()
-def tui() -> None:
-    """Launch Terminal User Interface."""
-    # Import here to avoid import errors when CLI is run on systems without TUI dependencies
-    try:
-        from .tui import launch_tui
-
-        launch_tui()
-    except ImportError as e:
-        console.print(f"[red]TUI not available: {e}[/red]")
-        console.print("[yellow]Install required dependencies:[/yellow]")
-        console.print("  uv pip install textual")
-        raise typer.Exit(1)
 
 
 @app.command()

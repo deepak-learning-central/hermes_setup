@@ -9,7 +9,6 @@ Portable, credential-free setup for deploying the [Hermes agent](https://hermes-
 - **Docker-based deployment** - Runs Hermes agent in isolated containers
 - **Zero-credential repository** - No secrets in git history
 - **Web-based UI configuration** - Browser-based setup with encrypted config storage
-- **Terminal User Interface (TUI)** - Easy management via text-based interface
 - **CI/CD pipeline** - Automated testing, building, and deployment
 - **Zero-downtime updates** - Updates without service interruption
 - **State persistence** - Agent memory and configuration survive updates
@@ -39,9 +38,6 @@ hermes-setup init
 
 # Launch the web setup UI
 hermes-setup web
-
-# Or launch the TUI
-hermes-setup tui
 ```
 
 ## Usage
@@ -63,9 +59,6 @@ hermes-setup logs --follow
 
 # Update to latest version
 hermes-setup update
-
-# Launch the Terminal User Interface
-hermes-setup tui
 
 # Launch the Web-based setup UI
 hermes-setup web
@@ -90,17 +83,6 @@ hermes-setup web --host 0.0.0.0 --port 8765
 - **Docker control** — Start, stop, restart, and view container logs
 - **State management** — Create and restore backups of persistent state
 - **Project init** — Generate compose files, `.env.example`, `.gitignore`, and security hooks
-
-### TUI Interface
-
-The Textual-based terminal UI provides the same management capabilities from the command line:
-
-- **Dashboard**: Real-time status and quick actions
-- **Configuration**: Modify agent settings
-- **Logs**: View container logs
-- **Management**: Backups, cleanup, and diagnostics
-
-Launch with: `hermes-setup tui`
 
 ## Configuration
 

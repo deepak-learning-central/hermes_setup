@@ -84,7 +84,7 @@ jobs:
         run: |
           echo "Running integration tests against staging..."
           sleep 10
-          # Hermes is a Textual TUI — verify compose started successfully
+          # Verify Docker compose started the service
           if docker compose -f docker/compose.yml ps --services --filter "status=running" | grep -q hermes-agent; then
             echo "Staging integration test: container started successfully"
           else
@@ -109,9 +109,7 @@ jobs:
           fi
           echo ""
           echo "=== CD DEPLOY NOTE ==="
-          echo "This is a build-verify pipeline for a Textual TUI app."
-          echo "Hermes requires an interactive terminal - see:"
-          echo "  docker compose -f docker/compose.prod.yml up     # interactive"
+          echo "This is a build-verify pipeline for the Hermes agent setup."
           echo "For server deployment, use: docker compose ... up -d on a host with a TTY"
           echo "======================"
 
