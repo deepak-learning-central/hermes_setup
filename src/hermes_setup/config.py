@@ -118,6 +118,24 @@ class HermesConfig(BaseSettings):
         description="API provider: huggingface | openai | ollama",
     )
 
+    # Channel integrations
+    telegram_bot_token: str | None = Field(
+        default=None,
+        description="Telegram bot token (from @BotFather)",
+    )
+    discord_bot_token: str | None = Field(
+        default=None,
+        description="Discord bot token (from Discord Developer Portal)",
+    )
+    slack_bot_token: str | None = Field(
+        default=None,
+        description="Slack bot token (xoxb-...)",
+    )
+    slack_app_token: str | None = Field(
+        default=None,
+        description="Slack app token (xapp-1-...)",
+    )
+
     # Logging
     log_level: str = Field(
         default="INFO",
@@ -198,6 +216,19 @@ HERMES_MAX_TOKENS=2048
 
 # For Ollama (API_PROVIDER=ollama):
 # HERMES_OLLAMA_HOST=http://host.docker.internal:11434  # default
+
+# ==========================================
+# Channel Integrations (uncomment and set if needed)
+# ==========================================
+# Get tokens from:
+#   Telegram: @BotFather → /newbot
+#   Discord:  https://discord.com/developers/applications → Bot
+#   Slack:    https://api.slack.com/apps → Bot
+#
+# TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+# DISCORD_BOT_TOKEN=your_discord_bot_token_here
+# SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+# SLACK_APP_TOKEN=xapp-1-your-slack-app-token
 
 # ==========================================
 # Logging
