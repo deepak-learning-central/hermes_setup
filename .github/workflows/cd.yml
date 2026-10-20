@@ -50,12 +50,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (requires GHCR org permissions)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/Dockerfile
+          # Push requires org package creation enabled:
+          #   deepak-learning-central -> Settings -> Actions -> General
+          #   -> Workflow permissions -> Read and write permissions
+          # OR provide a PAT secret named GHCR_PAT with write:packages scope
           push: true
           tags: |
             ghcr.io/${{ github.actor }}/hermes-setup:latest
