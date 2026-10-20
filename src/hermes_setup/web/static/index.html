@@ -149,7 +149,90 @@
                     });
                 });
             }
+
+            // Config load handler
+            var loadBtn = document.getElementById('btn-load-config');
+            if (loadBtn) {
+                loadBtn.addEventListener('click', function() {
+                    var loadPassphrase = document.getElementById('load-passphrase').value;
+                    var result = document.getElementById('config-result');
+                    if (!loadPassphrase) {
+                        result.textContent = 'Please enter passphrase to load';
+                        result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                        return;
+                    }
+                    loadBtn.disabled = true;
+                    loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Loading...';
+                    fetch('/config/load', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({passphrase: loadPassphrase})
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.ok && data.config) {
+                            populateConfig(data.config);
+                            result.textContent = 'Config loaded successfully';
+                            result.className = 'mt-4 h-6 text-sm font-medium text-green-600';
+                            document.getElementById('load-section').style.display = 'none';
+                        } else {
+                            result.textContent = 'Load failed: ' + (data.detail || 'wrong passphrase?');
+                            result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                        }
+                    })
+                    .catch(function(e) {
+                        result.textContent = 'Load failed: ' + e.message;
+                        result.className = 'mt-4 h-6 text-sm font-medium text-red-600';
+                    })
+                    .finally(function() {
+                        loadBtn.disabled = false;
+                        loadBtn.innerHTML = '<i class="fas fa-folder-open mr-2"></i> Load Config';
+                    });
+                });
+            }
+
+            // Check if config exists on config tab load
+            var checkConfigExists = function() {
+                fetch('/config/status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.ok && data.exists) {
+                            document.getElementById('load-section').style.display = 'block';
+                        }
+                    });
+            };
+            // Check on initial config tab load
+            document.addEventListener('htmx:afterSwap', function(evt) {
+                if (evt.detail.target && evt.detail.target.id === 'tab-content') {
+                    var path = window.location.pathname;
+                    if (path.startsWith('/tab/config') || path.includes('/tab/config')) {
+                        checkConfigExists();
+                    }
+                }
+            });
         });
+
+        function populateConfig(config) {
+            var fields = [
+                'docker_image', 'host_port', 'container_port', 'memory_limit',
+                'cpus_limit', 'data_dir', 'models_dir', 'model_name',
+                'api_provider', 'context_size', 'temperature', 'top_p',
+                'max_tokens', 'hf_token', 'openai_api_key', 'openai_base_url',
+                'ollama_host', 'telegram_bot_token', 'discord_bot_token',
+                'slack_bot_token', 'slack_app_token'
+            ];
+            fields.forEach(function(f) {
+                var el = document.getElementById(f);
+                if (el && config[f] !== undefined) {
+                    el.value = config[f];
+                }
+            });
+            // Pre-fill passphrase for convenience
+            var passEl = document.getElementById('passphrase');
+            if (passEl && document.getElementById('load-passphrase')) {
+                passEl.value = document.getElementById('load-passphrase').value;
+            }
+        }
 
         // Tab switching
         document.addEventListener('htmx:afterSwap', function(evt) {
