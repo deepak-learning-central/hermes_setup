@@ -10,9 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --version 0.5.0
-ENV PATH="/root/.local/bin:$PATH"
+# Install uv via pip for reliability (matches CI's uv version)
+RUN pip install --no-cache-dir uv==0.13.3
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
