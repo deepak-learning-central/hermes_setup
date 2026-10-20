@@ -5,7 +5,7 @@
 description = "Allowlisted patterns for Hermes Setup"
 paths = [
     '(?i).*\.example$',
-    '(?i)*\.template$',
+    '(?i).*\.template$',
     '(?i)README\.md$',
     '(?i)CHANGELOG\.md$',
     '(?i)LICENSE$',
