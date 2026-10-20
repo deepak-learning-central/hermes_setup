@@ -4,14 +4,14 @@
 [allowlist]
 description = "Allowlisted patterns for Hermes Setup"
 paths = [
-    "(?i).*\.example$",
-    "(?i).*\.template$",
-    "(?i)README\.md$",
-    "(?i)CHANGELOG\.md$",
-    "(?i)LICENSE$",
-    "(?i)\.gitleaks\.toml$",
-    "(?i)\.secrets\.baseline$",
-    "(?i)test.*\.py$",
+    '(?i).*\.example$',
+    '(?i).*\.template$',
+    '(?i)README\.md$',
+    '(?i)CHANGELOG\.md$',
+    '(?i)LICENSE$',
+    '(?i)\.gitleaks\.toml$',
+    '(?i)\.secrets\.baseline$',
+    '(?i)test.*\.py$',
 ]
 
 # Common patterns that are false positives
