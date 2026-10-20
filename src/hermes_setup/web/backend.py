@@ -105,6 +105,8 @@ async def config_save(request: ConfigSaveRequest) -> JSONResponse:
     session.set_passphrase(request.passphrase)
     session.service.apply_config(request.config)
     session.manager.save(session.service.config)
+    # Regenerate compose files so docker compose up uses the saved values
+    session.service.orchestrator.write_compose_files()
     return JSONResponse(
         {"ok": True, "path": str(session.manager.filepath), "exists": True}
     )

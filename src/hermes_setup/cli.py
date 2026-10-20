@@ -39,13 +39,9 @@ def init(
     console.print("  - .pre-commit-config.yaml")
     console.print("  - .gitleaks.toml")
     console.print("\nNext steps:")
-    console.print("  Option A (Web UI - recommended):")
-    console.print("    1. Run: hermes-setup web")
-    console.print("    2. Open http://127.0.0.1:8765 in your browser")
-    console.print("    3. Configure and save — encrypted config stored in .hermes-config.enc")
-    console.print("  Option B (CLI only):")
-    console.print("    1. Copy .env.example to .env and fill in your values")
-    console.print("    2. Run: hermes-setup up")
+    console.print("  1. Run: hermes-setup web")
+    console.print("  2. Open http://127.0.0.1:8765 in your browser")
+    console.print("  3. Configure and save — encrypted config stored in .hermes-config.enc")
 
 
 @app.command()

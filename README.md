@@ -40,31 +40,9 @@ hermes-setup web
 
 ## Usage
 
-### CLI Commands
-
-```bash
-# Start the agent
-hermes-setup up
-
-# Stop the agent
-hermes-setup down
-
-# Restart the agent
-hermes-setup restart
-
-# View logs
-hermes-setup logs --follow
-
-# Update to latest version
-hermes-setup update
-
-# Launch the Web-based setup UI
-hermes-setup web
-```
-
 ### Web Setup UI
 
-The web UI runs a local FastAPI backend on `http://127.0.0.1:8765` and serves a browser-based configuration page. It is the recommended way to configure and start Hermes for novice users.
+The web UI runs a local FastAPI backend on `http://127.0.0.1:8765` and serves a browser-based configuration page.
 
 ```bash
 # Start the web server
@@ -81,6 +59,42 @@ hermes-setup web --host 0.0.0.0 --port 8765
 - **Docker control** — Start, stop, restart, and view container logs
 - **State management** — Create and restore backups of persistent state
 - **Project init** — Generate compose files, `.env.example`, `.gitignore`, and security hooks
+
+### CLI Commands
+
+The CLI provides additional management commands for advanced users:
+
+```bash
+# Start the agent (requires .env file)
+hermes-setup up
+
+# Stop the agent
+hermes-setup down
+
+# Restart the agent
+hermes-setup restart
+
+# View logs
+hermes-setup logs --follow
+
+# Update to latest version
+hermes-setup update
+
+# Show configuration
+hermes-setup config
+
+# Create state backup
+hermes-setup backup
+
+# Restore from backup
+hermes-setup restore
+
+# Run diagnostics
+hermes-setup diagnose
+
+# Generate .env.example template
+hermes-setup generate:env-template
+```
 
 ## Configuration
 
