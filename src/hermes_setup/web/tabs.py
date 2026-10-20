@@ -7,8 +7,6 @@ real data instead of duplicating logic in JavaScript.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 # Each tab id -> static HTML fragment path (relative to the static dir).
 # Static fragments are served directly; dynamic ones below are generated
 # as Python strings so they can embed server-side values if needed later.

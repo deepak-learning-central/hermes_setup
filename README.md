@@ -139,7 +139,7 @@ uv run pytest
 uv run pytest --cov=src.hermes_setup
 
 # Run specific test file
-uv run pytest tests/test_tui.py
+uv run pytest tests/test_config_manager.py
 ```
 
 ### Code Quality
@@ -169,7 +169,6 @@ hermes-setup/
 │       ├── __init__.py
 │       ├── __main__.py     # CLI entrypoint
 │       ├── cli.py          # Typer-based CLI
-│       ├── tui.py          # Textual-based terminal interface
 │       ├── web/            # Web-based UI (FastAPI + HTMX)
 │       │   ├── __init__.py
 │       │   ├── backend.py  # FastAPI server + REST endpoints
@@ -187,7 +186,6 @@ hermes-setup/
 │   ├── __init__.py
 │   ├── test_config.py
 │   ├── test_docker.py
-│   ├── test_tui.py
 │   └── test_config_manager.py
 ├── docker/
 │   ├── Dockerfile          # Hermes agent Docker image
@@ -211,6 +209,5 @@ This project is not affiliated with Nous Research or the Hermes agent. It is a c
 ## Acknowledgments
 
 - [Nous Research Hermes](https://hermes-agent.nousresearch.com/) - The amazing personal assistant
-- [Textual](https://textual.textualize.io/) - Awesome TUI framework
 - [uv](https://docs.astral.sh/uv/) - Fast Python package installer
 - [Pydantic](https://docs.pydantic.dev/) - Data validation and settings management

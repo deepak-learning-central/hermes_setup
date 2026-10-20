@@ -395,10 +395,11 @@ repos:
         additional_dependencies: [
           "pydantic>=2.6.0",
           "pydantic-settings>=2.2.0",
-          "textual>=0.58.0",
           "typer>=0.12.0",
           "rich>=13.7.0",
           "httpx>=0.27.0",
+          "fastapi>=0.150.0",
+          "cryptography>=50.0.2",
         ]
 
   # Security - Bandit

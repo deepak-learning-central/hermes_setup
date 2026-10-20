@@ -7,7 +7,6 @@ while reusing 100% of the existing functionality (Docker, config, state).
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from typing import Any
 
 from ..config import HermesConfig, env_field_name
