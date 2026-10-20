@@ -3,9 +3,10 @@
 # Environment files - NEVER commit these!
 .env
 .env.*
-*.env
 *.env.local
 *.env.production
+# Exception: .env.example is tracked as a template (NOT ignored)
+!.env.example
 
 # Secrets and credentials
 *.pem
