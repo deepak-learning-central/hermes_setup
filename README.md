@@ -9,11 +9,9 @@ Portable, credential-free setup for deploying the [Hermes agent](https://hermes-
 - **Docker-based deployment** - Runs Hermes agent in isolated containers
 - **Zero-credential repository** - No secrets in git history
 - **Web-based UI configuration** - Browser-based setup with encrypted config storage
-- **CI/CD pipeline** - Automated testing, building, and deployment
 - **Zero-downtime updates** - Updates without service interruption
 - **State persistence** - Agent memory and configuration survive updates
 - **Cross-platform** - Works on Linux, macOS, and WSL2
-- **Secure by design** - Pre-commit hooks and CI scans prevent secret leaks
 
 ## Quick Start
 
@@ -112,19 +110,11 @@ The Hermes agent maintains persistent state in:
 
 These directories are mounted as Docker volumes and survive container updates.
 
-## CI/CD Pipeline
-
-The project includes GitHub Actions workflows for continuous integration and deployment:
-
-- **CI Workflow** (`.github/workflows/ci.yml`): Linting, testing, security scans
-- **CD Workflow** (`.github/workflows/cd.yml`): Zero-downtime deployment with rollback
-
 ## Security
 
 - **No secrets in repository**: All sensitive values must be in `.env` (gitignored)
 - **Encrypted UI config**: `.hermes-config.enc` holds web UI configuration, encrypted with your passphrase — never committed
 - **Pre-commit hooks**: Prevent accidental secret commits
-- **CI secret scanning**: Fails builds if secrets are detected
 - **Environment isolation**: Secrets loaded only at runtime
 
 ## Development
@@ -160,10 +150,6 @@ uv run ruff format src tests
 
 ```
 hermes-setup/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml          # Lint, test, security scans
-│       └── cd.yml          # Zero-downtime deployment
 ├── src/
 │   └── hermes_setup/
 │       ├── __init__.py
