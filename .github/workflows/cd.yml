@@ -58,8 +58,8 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/hermes-setup:latest
-            ghcr.io/${{ github.repository_owner }}/hermes-setup:${{ github.sha }}
+            ghcr.io/${{ github.actor }}/hermes-setup:latest
+            ghcr.io/${{ github.actor }}/hermes-setup:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -86,6 +86,13 @@ jobs:
             echo "Production deployment failed - rolling back..."
             exit 1
           }
+          echo ""
+          echo "=== CD DEPLOY NOTE ==="
+          echo "This deploys the image on the GitHub runner (ephemeral VM)."
+          echo "For actual production deployment, on your server run:"
+          echo "  docker pull ghcr.io/\${{ github.actor }}/hermes-setup:latest"
+          echo "  docker compose -f docker/compose.prod.yml up -d"
+          echo "======================"
 
       - name: Notify deployment
         if: always()
