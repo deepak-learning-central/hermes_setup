@@ -28,6 +28,10 @@ COPY docker/ ./docker/
 # Copy config
 COPY docker/hermes/ ./config/
 
+# Install dependencies
+ARG BUILDER_REFRESH=1
+RUN uv sync --frozen --no-cache --no-dev
+
 # Build stage
 FROM python:3.11-slim AS runtime
 
