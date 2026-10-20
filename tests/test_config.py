@@ -15,8 +15,9 @@ class TestHermesConfig:
         """Test default configuration values."""
         config = HermesConfig()
         assert config.docker_image == "nousresearch/hermes-agent:latest"
-        assert config.host_port == 8000
-        assert config.container_port == 8000
+        assert config.api_port == 8642
+        assert config.dashboard_port == 9119
+        assert config.enable_dashboard is True
         assert config.memory_limit == "4g"
         assert config.cpus_limit == 2.0
         assert config.model_name == "NousResearch/Hermes-3-Llama-3.1-8B"
@@ -39,14 +40,14 @@ class TestHermesConfig:
 
     def test_port_validation(self):
         """Test port validation."""
-        config = HermesConfig(host_port=8080)
-        assert config.host_port == 8080
+        config = HermesConfig(api_port=8080)
+        assert config.api_port == 8080
 
         with pytest.raises(ValidationError):
-            HermesConfig(host_port=0)
+            HermesConfig(api_port=0)
 
         with pytest.raises(ValidationError):
-            HermesConfig(host_port=65536)
+            HermesConfig(api_port=65536)
 
     def test_context_size_validation(self):
         """Test context size validation."""
@@ -100,7 +101,9 @@ class TestHermesConfig:
         """Test .env.example template generation."""
         template = HermesConfig.get_default_env_template()
         assert "HERMES_DOCKER_IMAGE" in template
-        assert "HERMES_HOST_PORT" in template
+        assert "HERMES_API_PORT" in template
+        assert "HERMES_DASHBOARD_PORT" in template
+        assert "API_SERVER_KEY" in template
         assert "HERMES_MEMORY_LIMIT" in template
         assert "HERMES_HF_TOKEN" in template
         assert "# NEVER commit .env" in template

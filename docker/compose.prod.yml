@@ -1,40 +1,53 @@
-version: '3.8'
+# Production deployment of the official Nous Research Hermes agent image.
+#
+# Differences from the development compose file:
+#   * a stable image tag rather than `latest`
+#   * a named volume for /opt/data (state survives image updates)
+#   * the API server key is required — the gateway refuses to expose it
+#     without one, so the deployment fails fast instead of silently
+#     serving unauthenticated
+#
+# Generate a key with:  openssl rand -hex 32
 
 services:
   hermes:
-    image: ${HERMES_DOCKER_IMAGE:-nousresearch/hermes:latest}
-    container_name: hermes-agent-prod
+    image: ${HERMES_DOCKER_IMAGE:-nousresearch/hermes-agent:stable}
+    container_name: hermes
     restart: unless-stopped
+    command: ["gateway", "run"]
     ports:
-      - "${HERMES_HOST_PORT:-8000}:${HERMES_CONTAINER_PORT:-8000}"
+      - "${HERMES_API_PORT:-8642}:8642"
+      - "${HERMES_DASHBOARD_PORT:-9119}:9119"
     environment:
-      - MODEL_NAME=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
-      - CONTEXT_SIZE=${HERMES_CONTEXT_SIZE:-8192}
-      - TEMPERATURE=${HERMES_TEMPERATURE:-0.7}
-      - TOP_P=${HERMES_TOP_P:-0.9}
-      - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
-      - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
-      - HERMES_HF_TOKEN=${HERMES_HF_TOKEN:-}
-      - HERMES_OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
-      - API_PROVIDER=${API_PROVIDER:-ollama}
-      # Channel integrations
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      - API_PROVIDER=${API_PROVIDER:-huggingface}
+      - HERMES_MODEL=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
+      - HF_TOKEN=${HERMES_HF_TOKEN:-}
+      - OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${HERMES_OPENAI_BASE_URL:-}
+      - OLLAMA_BASE_URL=${HERMES_OLLAMA_HOST:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
       - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
+      - API_SERVER_ENABLED=${API_SERVER_ENABLED:-true}
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY=${API_SERVER_KEY:?API_SERVER_KEY is required in production (openssl rand -hex 32)}
+      - HERMES_DASHBOARD=${HERMES_DASHBOARD:-0}
+      - HERMES_DASHBOARD_HOST=127.0.0.1
     volumes:
-      - ${HERMES_DATA_DIR:-../data}:/app/data
-      - ${HERMES_MODELS_DIR:-../models}:/app/models
+      - hermes-data:/opt/data
     deploy:
       resources:
         limits:
           memory: ${HERMES_MEMORY_LIMIT:-4g}
           cpus: '${HERMES_CPUS_LIMIT:-2.0}'
         reservations:
-          memory: 2g
-          cpus: '1.0'
+          memory: 1g
+          cpus: '0.5'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${HERMES_CONTAINER_PORT:-8000}/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8642/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -42,8 +55,6 @@ services:
 
 volumes:
   hermes-data:
-    driver: local
-  hermes-models:
     driver: local
 
 networks:

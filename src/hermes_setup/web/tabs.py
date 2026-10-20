@@ -12,39 +12,77 @@ from __future__ import annotations
 # as Python strings so they can embed server-side values if needed later.
 
 
-def dashboard() -> str:
-    """Dashboard: quick status + start/stop buttons + health card."""
+def _action_buttons() -> str:
+    """Shared Start / Restart / Stop button group."""
     return """
-<div class="max-w-6xl mx-auto space-y-6">
-  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-    <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <button
-        hx-post="/docker/start"
-        hx-target="#docker-card"
-        hx-swap="outerHTML"
-        hx-indicator=".htmx-indicator"
-        class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+        type="button"
+        data-docker-action="start"
+        class="docker-action bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
       >
         <i class="fas fa-play"></i> Start Hermes
       </button>
       <button
-        hx-post="/docker/restart"
-        hx-target="#docker-card"
-        hx-swap="outerHTML"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+        type="button"
+        data-docker-action="restart"
+        class="docker-action bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
       >
         <i class="fas fa-redo"></i> Restart
       </button>
       <button
-        hx-post="/docker/stop"
-        hx-target="#docker-card"
-        hx-swap="outerHTML"
-        class="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+        type="button"
+        data-docker-action="stop"
+        class="docker-action bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
       >
         <i class="fas fa-stop"></i> Stop
       </button>
     </div>
+"""
+
+
+def _job_panel() -> str:
+    """Shared progress panel shown while a Docker operation runs."""
+    return """
+  <div id="job-panel" class="hidden mt-4 p-4 rounded-lg border border-blue-200 bg-blue-50">
+    <div class="flex items-center gap-3">
+      <i class="fas fa-circle-notch fa-spin text-blue-600"></i>
+      <span id="job-title" class="text-sm font-medium text-blue-800">Working...</span>
+      <span id="job-elapsed" class="text-xs text-blue-600 ml-auto">0s</span>
+    </div>
+    <pre id="job-output" class="mt-3 bg-gray-900 text-gray-300 rounded-md p-3 text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap"></pre>
+  </div>
+"""
+
+
+def _status_card(card_id: str) -> str:
+    """Shared Docker status card markup."""
+    return f"""
+    <div id="{card_id}" class="space-y-3">
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <span class="text-gray-600">Docker Engine</span>
+        <span class="text-sm font-medium text-gray-500" data-status="docker">Checking...</span>
+      </div>
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <span class="text-gray-600">Docker Compose</span>
+        <span class="text-sm font-medium text-gray-500" data-status="compose">Checking...</span>
+      </div>
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <span class="text-gray-600">Container State</span>
+        <span class="text-sm font-medium text-gray-500" data-status="container">Checking...</span>
+      </div>
+    </div>
+"""
+
+
+def dashboard() -> str:
+    """Dashboard: quick status + start/stop buttons + health card."""
+    return f"""
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
+{_action_buttons()}
+{_job_panel()}
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -53,25 +91,12 @@ def dashboard() -> str:
         <i class="fas fa-docker text-blue-600 mr-2"></i>
         Docker Status
       </h2>
-      <div class="space-y-3">
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <span class="text-gray-600">Docker Engine</span>
-          <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <span class="text-gray-600">Docker Compose</span>
-          <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <span class="text-gray-600">Container State</span>
-          <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-        </div>
-      </div>
+{_status_card("docker-status-card")}
       <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p class="text-sm text-blue-700">
           <i class="fas fa-info-circle mr-2"></i>
-          Docker status will appear here after the backend is running.
-          Click "Start Hermes" to begin.
+          Container state is refreshed automatically. Click "Start Hermes" to begin —
+          progress appears below the buttons.
         </p>
       </div>
     </div>
@@ -133,16 +158,26 @@ def config() -> str:
           <label for="docker_image" class="block text-sm font-medium text-gray-700 mb-1">Docker Image</label>
           <input id="docker_image" type="text" value="nousresearch/hermes-agent:latest"
                  class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          <p class="text-xs text-gray-500 mt-1">Use <code>:stable</code> for production deployments</p>
         </div>
         <div>
-          <label for="host_port" class="block text-sm font-medium text-gray-700 mb-1">Host Port</label>
-          <input id="host_port" type="number" value="8000"
+          <label for="api_port" class="block text-sm font-medium text-gray-700 mb-1">API Server Port</label>
+          <input id="api_port" type="number" value="8642"
+                 class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          <p class="text-xs text-gray-500 mt-1">OpenAI-compatible API served by the agent</p>
+        </div>
+        <div>
+          <label for="dashboard_port" class="block text-sm font-medium text-gray-700 mb-1">Dashboard Port</label>
+          <input id="dashboard_port" type="number" value="9119"
                  class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
         </div>
         <div>
-          <label for="container_port" class="block text-sm font-medium text-gray-700 mb-1">Container Port</label>
-          <input id="container_port" type="number" value="8000"
-                 class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          <label for="enable_dashboard" class="block text-sm font-medium text-gray-700 mb-1">Enable Web Dashboard</label>
+          <select id="enable_dashboard"
+                  class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
         </div>
         <div>
           <label for="memory_limit" class="block text-sm font-medium text-gray-700 mb-1">Memory Limit</label>
@@ -153,6 +188,15 @@ def config() -> str:
           <label for="cpus_limit" class="block text-sm font-medium text-gray-700 mb-1">CPU Limit</label>
           <input id="cpus_limit" type="number" step="0.5" value="2"
                  class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+        </div>
+        <div class="md:col-span-2">
+          <label for="api_server_key" class="block text-sm font-medium text-gray-700 mb-1">API Server Key</label>
+          <input id="api_server_key" type="password" autocomplete="off" placeholder="At least 16 characters"
+                 class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          <p class="text-xs text-gray-500 mt-1">
+            Required for the OpenAI-compatible API. The agent refuses to expose the API without one.
+            Generate with <code>openssl rand -hex 32</code>.
+          </p>
         </div>
       </div>
     </fieldset>
@@ -165,7 +209,7 @@ def config() -> str:
           <label for="data_dir" class="block text-sm font-medium text-gray-700 mb-1">Data Directory</label>
           <input id="data_dir" type="text" value="./data"
                  class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-          <p class="text-xs text-gray-500 mt-1">Agent memory and conversation history</p>
+          <p class="text-xs text-gray-500 mt-1">Host path backing the agent's /opt/data volume</p>
         </div>
         <div>
           <label for="models_dir" class="block text-sm font-medium text-gray-700 mb-1">Models Directory</label>
@@ -305,64 +349,28 @@ def config() -> str:
 
 def docker_control() -> str:
     """Docker control tab: start/stop/status and log viewer."""
-    return """
+    return f"""
 <div class="max-w-6xl mx-auto space-y-6">
   <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <h2 class="text-xl font-bold text-gray-800 mb-4">Docker Control</h2>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <button
-        hx-post="/docker/start"
-        hx-target="#docker-status-card"
-        hx-swap="outerHTML"
-        class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors"
-      >
-        <i class="fas fa-play mr-2"></i> Start Agent
-      </button>
-      <button
-        hx-post="/docker/restart"
-        hx-target="#docker-status-card"
-        hx-swap="outerHTML"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors"
-      >
-        <i class="fas fa-redo mr-2"></i> Restart
-      </button>
-      <button
-        hx-post="/docker/stop"
-        hx-target="#docker-status-card"
-        hx-swap="outerHTML"
-        class="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg shadow transition-colors"
-      >
-        <i class="fas fa-stop mr-2"></i> Stop
-      </button>
-    </div>
+{_action_buttons()}
+{_job_panel()}
 
-    <div id="docker-status-card" class="space-y-3">
-      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-        <span class="text-gray-600">Docker Engine</span>
-        <span class="text-sm font-medium text-yellow-600">Checking...</span>
-      </div>
-      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-        <span class="text-gray-600">Docker Compose</span>
-        <span class="text-sm font-medium text-yellow-600">Checking...</span>
-      </div>
-      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-        <span class="text-gray-600">Container State</span>
-        <span class="text-sm font-medium text-yellow-600">Checking...</span>
-      </div>
+    <div class="mt-6">
+{_status_card("docker-status-card")}
     </div>
   </div>
 
   <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <h2 class="text-lg font-bold text-gray-800 mb-4">Container Logs</h2>
-    <div class="bg-gray-900 rounded-md p-4 overflow-auto h-96 font-mono text-xs text-gray-300" id="logs-viewer">
+    <div class="bg-gray-900 rounded-md p-4 overflow-auto h-96 font-mono text-xs text-gray-300 whitespace-pre-wrap" id="logs-viewer">
       Click "Refresh Logs" to view container output.
     </div>
     <div class="mt-4 flex gap-2">
       <button
-        hx-get="/docker/status-full"
-        hx-target="#logs-viewer"
-        hx-swap="outerHTML"
+        type="button"
+        id="btn-refresh-logs"
         class="bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-2 px-4 rounded-lg"
       >
         Refresh Logs

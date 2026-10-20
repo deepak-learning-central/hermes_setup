@@ -15,8 +15,8 @@ class TestDockerOrchestrator:
     def config(self):
         """Create test configuration."""
         return HermesConfig(
-            host_port=8080,
-            container_port=8080,
+            api_port=8080,
+            dashboard_port=8081,
             data_dir="./test_data",
             models_dir="./test_models",
         )
@@ -89,12 +89,13 @@ class TestDockerOrchestrator:
     def test_generate_compose_file(self, orchestrator):
         """Test compose file generation."""
         content = orchestrator.generate_compose_file()
-        assert "version: '3.8'" in content
+        assert "services:" in content
         assert "hermes:" in content
         assert "nousresearch/hermes-agent:latest" in content
-        assert "8080:8080" in content  # test ports
-        assert f"{orchestrator.config.get_data_path()}:/app/data" in content
-        assert f"{orchestrator.config.get_models_path()}:/app/models" in content
+        assert "8080:8642" in content  # test API port -> container API port
+        assert "8081:9119" in content  # test dashboard port
+        assert "hermes-data:/opt/data" in content
+        assert 'command: ["gateway", "run"]' in content
         assert "memory: 4g" in content
         assert "cpus: '2.0'" in content
 

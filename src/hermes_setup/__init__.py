@@ -21,25 +21,3 @@ try:
     __all__.append("app")
 except ImportError:
     pass
-
-# ---------------------------------------------------------------------------
-# TODO: SSH-based production deployment
-# ---------------------------------------------------------------------------
-# The current CD pipeline only builds and verifies the image on GitHub's
-# ephemeral runner — it never deploys to a real server. To make it a true
-# production deployment, add an SSH deploy step to .github/workflows/cd.yml:
-#
-#   - name: Deploy to production host
-#     uses: appleboy/ssh-action@v1
-#     with:
-#       host: ${{ secrets.PROD_HOST }}
-#       username: ${{ secrets.PROD_USER }}
-#       key: ${{ secrets.PROD_SSH_KEY }}
-#       script: |
-#         docker pull ghcr.io/${{ github.actor }}/hermes-setup:latest
-#         docker compose -f docker/compose.prod.yml up -d
-#
-# This would pull the freshly-published image onto your actual server and
-# restart the container there. Requires PROD_HOST, PROD_USER, and PROD_SSH_KEY
-# secrets, plus SSH key access on the target host.
-# ---------------------------------------------------------------------------

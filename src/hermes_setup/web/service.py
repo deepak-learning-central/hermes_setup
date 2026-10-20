@@ -7,6 +7,7 @@ while reusing 100% of the existing functionality (Docker, config, state).
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from typing import Any
 
 from ..config import HermesConfig, env_field_name
@@ -31,13 +32,46 @@ class SetupService:
     # ------------------------------------------------------------------
 
     def apply_config(self, values: dict[str, Any]) -> None:
-        """Apply a flat dict of env-var values onto the current config."""
+        """Apply a flat dict of values onto the current config.
+
+        Keys may be either config field names (``docker_image``) or the
+        canonical env var names (``HERMES_DOCKER_IMAGE``) — the web UI uses
+        field names, the CLI and .env use env var names.
+        """
         for field_name in self.config.model_fields:
             env_key = env_field_name(field_name)
-            if env_key in values:
-                setattr(self.config, field_name, values[env_key])
+            if field_name in values:
+                raw = values[field_name]
+            elif env_key in values:
+                raw = values[env_key]
+            else:
+                continue
+            setattr(self.config, field_name, self._coerce(field_name, raw))
+
         # Recreate orchestrator with updated config
         self.orchestrator = DockerOrchestrator(self.config)
+
+    @staticmethod
+    def _coerce(field_name: str, raw: Any) -> Any:
+        """Coerce a raw form value to the type the config field expects."""
+        field = HermesConfig.model_fields[field_name]
+        annotation = field.annotation
+
+        if raw is None or raw == "":
+            return None
+
+        if annotation is bool:
+            if isinstance(raw, bool):
+                return raw
+            return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+        if annotation is int:
+            return int(str(raw).strip())
+
+        if annotation is float:
+            return float(str(raw).strip())
+
+        return raw
 
     def config_to_dict(self) -> dict[str, Any]:
         """Export the current config as a flat dict keyed by env var."""
@@ -96,6 +130,57 @@ class SetupService:
     def restart(self, production: bool = False) -> dict[str, Any]:
         ok = self.orchestrator.restart(production=production)
         return {"ok": ok, "message": "Restarted" if ok else "Restart failed"}
+
+    # ------------------------------------------------------------------
+    # Streaming variants (used by background jobs)
+    # ------------------------------------------------------------------
+
+    def start_streaming(
+        self, production: bool = False, on_line: Callable[[str], None] | None = None
+    ) -> bool:
+        """Start the containers, streaming compose output to *on_line*."""
+        self.ensure_compose_files(on_line)
+        ok, _ = self.orchestrator.stream_compose(
+            ["up", "-d"], production=production, on_line=on_line
+        )
+        return ok
+
+    def ensure_compose_files(self, on_line: Callable[[str], None] | None = None) -> None:
+        """Write the compose files if they are missing or out of date.
+
+        The web UI is the only supported setup path, so starting the agent
+        must not fail just because the user has not run ``init`` yet.
+        """
+        compose_file = self.orchestrator.compose_file
+        prod_file = self.orchestrator.compose_prod_file
+        if compose_file.exists() and prod_file.exists():
+            return
+
+        if on_line:
+            on_line("Compose files missing — generating them from the current config...")
+        self.orchestrator.write_compose_files()
+        if on_line:
+            on_line(f"Wrote {compose_file}")
+
+    def stop_streaming(
+        self,
+        production: bool = False,
+        volumes: bool = False,
+        on_line: Callable[[str], None] | None = None,
+    ) -> bool:
+        """Stop the containers, streaming compose output to *on_line*."""
+        args = ["down"]
+        if volumes:
+            args.append("-v")
+        ok, _ = self.orchestrator.stream_compose(args, production=production, on_line=on_line)
+        return ok
+
+    def restart_streaming(
+        self, production: bool = False, on_line: Callable[[str], None] | None = None
+    ) -> bool:
+        """Restart the containers, streaming compose output to *on_line*."""
+        self.stop_streaming(production=production, on_line=on_line)
+        return self.start_streaming(production=production, on_line=on_line)
 
     def status(self) -> dict[str, Any]:
         return self.orchestrator.status()

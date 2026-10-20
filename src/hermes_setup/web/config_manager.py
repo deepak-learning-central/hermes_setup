@@ -76,12 +76,16 @@ class EncryptedConfigManager:
         """Rebuild a HermesConfig from a flat dict of env var values."""
         from ..config import field_name_for_env
 
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         for env_key, value in data.items():
             field_name = field_name_for_env(env_key)
             if field_name is not None:
                 kwargs[field_name] = value
-        return HermesConfig(_env_file=None, **kwargs)
+        # Build the model directly so the values from the encrypted file are
+        # used verbatim, without the process environment or a stray .env
+        # file overriding them.
+        config = HermesConfig.model_construct(**kwargs)
+        return HermesConfig.model_validate(config.model_dump())
 
     # ------------------------------------------------------------------
     # Persistence

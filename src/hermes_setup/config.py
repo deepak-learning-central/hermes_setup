@@ -12,8 +12,10 @@ _ENV_FIELD_NAMES = {
     "docker_image": "HERMES_DOCKER_IMAGE",
     "docker_compose_file": "HERMES_DOCKER_COMPOSE_FILE",
     "docker_compose_prod_file": "HERMES_DOCKER_COMPOSE_PROD_FILE",
-    "host_port": "HERMES_HOST_PORT",
-    "container_port": "HERMES_CONTAINER_PORT",
+    "api_port": "HERMES_API_PORT",
+    "dashboard_port": "HERMES_DASHBOARD_PORT",
+    "api_server_key": "API_SERVER_KEY",
+    "enable_dashboard": "HERMES_DASHBOARD",
     "memory_limit": "HERMES_MEMORY_LIMIT",
     "cpus_limit": "HERMES_CPUS_LIMIT",
     "data_dir": "HERMES_DATA_DIR",
@@ -76,17 +78,25 @@ class HermesConfig(BaseSettings):
     )
 
     # Network settings
-    host_port: int = Field(
-        default=8000,
-        description="Host port to bind Hermes agent",
+    api_port: int = Field(
+        default=8642,
+        description="Host port for the Hermes OpenAI-compatible API server",
         ge=1,
         le=65535,
     )
-    container_port: int = Field(
-        default=8000,
-        description="Container port for Hermes agent",
+    dashboard_port: int = Field(
+        default=9119,
+        description="Host port for the Hermes web dashboard",
         ge=1,
         le=65535,
+    )
+    api_server_key: str | None = Field(
+        default=None,
+        description="API server auth key (at least 16 characters); required to expose the API",
+    )
+    enable_dashboard: bool = Field(
+        default=True,
+        description="Run the Hermes web dashboard alongside the gateway",
     )
 
     # Resource limits
@@ -228,8 +238,19 @@ HERMES_DOCKER_COMPOSE_PROD_FILE=docker/compose.prod.yml
 # ==========================================
 # Network Settings
 # ==========================================
-HERMES_HOST_PORT=8000
-HERMES_CONTAINER_PORT=8000
+# Port for the agent's OpenAI-compatible API server
+HERMES_API_PORT=8642
+# Port for the agent's web dashboard
+HERMES_DASHBOARD_PORT=9119
+# Run the web dashboard alongside the gateway
+HERMES_DASHBOARD=true
+
+# ==========================================
+# API Server Key
+# ==========================================
+# The agent refuses to expose its API server without a key of at least
+# 16 characters.  Generate one with:  openssl rand -hex 32
+API_SERVER_KEY=
 
 # ==========================================
 # Resource Limits
@@ -266,7 +287,7 @@ HERMES_MAX_TOKENS=2048
 # HERMES_OPENAI_BASE_URL=https://api.openai.com/v1  # optional, for custom endpoints
 
 # For Ollama (API_PROVIDER=ollama):
-# HERMES_OLLAMA_HOST=http://host.docker.internal:11434  # default
+# HERMES_OLLAMA_HOST=http://host.docker.internal:11434/v1  # default
 
 # ==========================================
 # Channel Integrations (uncomment and set if needed)

@@ -1,48 +1,64 @@
-version: '3.8'
+# Runs the official Nous Research Hermes agent image.
+#
+# The agent keeps ALL of its state (config, API keys, sessions, skills,
+# memories) in a single directory mounted at /opt/data.  The gateway is
+# started with `gateway run`, which is the container's supervised default.
+#
+# The API server (OpenAI-compatible) is only enabled when API_SERVER_KEY is
+# set — a key of at least 16 characters is required, otherwise the gateway
+# refuses to start it.
 
 services:
   hermes:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    image: hermes-setup:local
-    container_name: hermes-agent
+    image: ${HERMES_DOCKER_IMAGE:-nousresearch/hermes-agent:latest}
+    container_name: hermes
     restart: unless-stopped
+    command: ["gateway", "run"]
     ports:
-      - "${HERMES_HOST_PORT:-8000}:${HERMES_CONTAINER_PORT:-8000}"
+      - "${HERMES_API_PORT:-8642}:8642"
+      - "${HERMES_DASHBOARD_PORT:-9119}:9119"
     environment:
-      - MODEL_NAME=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
-      - CONTEXT_SIZE=${HERMES_CONTEXT_SIZE:-8192}
-      - TEMPERATURE=${HERMES_TEMPERATURE:-0.7}
-      - TOP_P=${HERMES_TOP_P:-0.9}
-      - MAX_TOKENS=${HERMES_MAX_TOKENS:-2048}
-      - LOG_LEVEL=${HERMES_LOG_LEVEL:-INFO}
-      - HERMES_HF_TOKEN=${HERMES_HF_TOKEN:-}
-      - HERMES_OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
+      # Host UID/GID so files written in the volume stay owned by you.
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      # Model / provider
       - API_PROVIDER=${API_PROVIDER:-huggingface}
+      - HERMES_MODEL=${HERMES_MODEL_NAME:-NousResearch/Hermes-3-Llama-3.1-8B}
+      - HF_TOKEN=${HERMES_HF_TOKEN:-}
+      - OPENAI_API_KEY=${HERMES_OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${HERMES_OPENAI_BASE_URL:-}
+      - OLLAMA_BASE_URL=${HERMES_OLLAMA_HOST:-}
       # Channel integrations
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
       - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
+      # OpenAI-compatible API server
+      - API_SERVER_ENABLED=${API_SERVER_ENABLED:-true}
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY=${API_SERVER_KEY:-}
+      # Web dashboard (loopback-only inside the container; auth required
+      # for any non-loopback bind).
+      - HERMES_DASHBOARD=${HERMES_DASHBOARD:-1}
+      - HERMES_DASHBOARD_HOST=127.0.0.1
     volumes:
-      - ../data:/app/data
-      - ../models:/app/models
+      # A named volume avoids the SQLite WAL corruption that happens when
+      # /opt/data is a bind mount on macOS/Windows Docker Desktop.
+      - hermes-data:/opt/data
     deploy:
       resources:
         limits:
           memory: ${HERMES_MEMORY_LIMIT:-4g}
           cpus: '${HERMES_CPUS_LIMIT:-2.0}'
         reservations:
-          memory: 2g
-          cpus: '1.0'
+          memory: 1g
+          cpus: '0.5'
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "hermes_setup"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8642/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 90s
 
 volumes:
   hermes-data:
-  hermes-models:

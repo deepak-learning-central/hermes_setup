@@ -10,6 +10,9 @@
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        /* HTMX request indicator — visible only while a request is in flight */
+        .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+        .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">

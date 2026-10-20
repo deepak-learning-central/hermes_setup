@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from . import jobs
 from .config_manager import EncryptedConfigManager
 from .service import SetupService, find_available_port, is_port_in_use
 from .tabs import render_tab
@@ -107,9 +108,7 @@ async def config_save(request: ConfigSaveRequest) -> JSONResponse:
     session.manager.save(session.service.config)
     # Regenerate compose files so docker compose up uses the saved values
     session.service.orchestrator.write_compose_files()
-    return JSONResponse(
-        {"ok": True, "path": str(session.manager.filepath), "exists": True}
-    )
+    return JSONResponse({"ok": True, "path": str(session.manager.filepath), "exists": True})
 
 
 @app.post("/config/load")
@@ -164,32 +163,59 @@ async def docker_status() -> JSONResponse:
 
 
 @app.post("/docker/start")
-async def docker_start(request: DockerActionRequest) -> JSONResponse:
-    """Start the Hermes agent containers."""
-    result = session.service.start(production=request.production)
-    return JSONResponse({"ok": True, **result})
+async def docker_start(request: DockerActionRequest | None = None) -> JSONResponse:
+    """Start the Hermes agent containers (as a background job)."""
+    production = request.production if request else False
+    job = jobs.manager.submit(
+        "Starting Hermes",
+        lambda emit: session.service.start_streaming(production=production, on_line=emit),
+    )
+    return JSONResponse({"ok": True, "job_id": job.id, "action": job.action})
 
 
 @app.post("/docker/stop")
-async def docker_stop(request: DockerActionRequest) -> JSONResponse:
-    """Stop the Hermes agent containers."""
-    result = session.service.stop(production=request.production, volumes=request.production)
-    return JSONResponse({"ok": True, **result})
+async def docker_stop(request: DockerActionRequest | None = None) -> JSONResponse:
+    """Stop the Hermes agent containers (as a background job)."""
+    production = request.production if request else False
+    job = jobs.manager.submit(
+        "Stopping Hermes",
+        lambda emit: session.service.stop_streaming(
+            production=production, volumes=production, on_line=emit
+        ),
+    )
+    return JSONResponse({"ok": True, "job_id": job.id, "action": job.action})
 
 
 @app.post("/docker/restart")
-async def docker_restart(request: DockerActionRequest) -> JSONResponse:
-    """Restart the Hermes agent containers."""
-    result = session.service.restart(production=request.production)
-    return JSONResponse({"ok": True, **result})
+async def docker_restart(request: DockerActionRequest | None = None) -> JSONResponse:
+    """Restart the Hermes agent containers (as a background job)."""
+    production = request.production if request else False
+    job = jobs.manager.submit(
+        "Restarting Hermes",
+        lambda emit: session.service.restart_streaming(production=production, on_line=emit),
+    )
+    return JSONResponse({"ok": True, "job_id": job.id, "action": job.action})
+
+
+@app.get("/jobs/{job_id}")
+async def job_status(job_id: str) -> JSONResponse:
+    """Return the state of a background Docker operation."""
+    job = jobs.manager.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job id")
+    return JSONResponse({"ok": True, **job.to_dict()})
 
 
 @app.get("/docker/status-full")
 async def docker_status_full() -> JSONResponse:
     """Full container status plus recent logs."""
-    return JSONResponse(
-        {"ok": True, **session.service.status(), "logs": session.service.logs()}
-    )
+    return JSONResponse({"ok": True, **session.service.status(), "logs": session.service.logs()})
+
+
+@app.get("/docker/logs")
+async def docker_logs(tail: int = 200) -> JSONResponse:
+    """Recent container logs as plain text."""
+    return JSONResponse({"ok": True, "logs": session.service.logs(tail=tail)})
 
 
 # ---------------------------------------------------------------------------
@@ -258,9 +284,12 @@ async def tab(tab_name: str) -> HTMLResponse:
     return HTMLResponse(render_tab(tab_name))
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health() -> JSONResponse:
-    """Liveness probe used by the frontend connection indicator."""
+    """Liveness probe used by the frontend connection indicator.
+
+    ``HEAD`` is accepted as well so the browser can poll it cheaply.
+    """
     return JSONResponse({"ok": True, "status": "healthy"})
 
 

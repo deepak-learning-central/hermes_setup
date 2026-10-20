@@ -3,6 +3,7 @@
 import contextlib
 import os
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -82,54 +83,69 @@ class DockerOrchestrator:
         return issues
 
     def generate_compose_file(self, production: bool = False) -> str:
-        """Generate Docker Compose file content."""
+        """Generate Docker Compose file content.
+
+        The compose file runs the official ``nousresearch/hermes-agent`` image
+        in gateway mode.  The agent keeps all of its state in ``/opt/data``,
+        backed by a named volume so SQLite's WAL mode stays coherent.
+        """
         config = self.config
-        data_dir = config.get_data_path()
-        models_dir = config.get_models_path()
+        image = config.docker_image
+        if production and image.endswith(":latest"):
+            image = image.replace(":latest", ":stable")
+        dashboard = "1" if config.enable_dashboard else "0"
 
-        compose_content = f"""version: '3.8'
+        api_key = config.api_server_key or ""
+        if production and not api_key:
+            # Fail fast rather than silently serving an unauthenticated API.
+            api_key = "${API_SERVER_KEY:?API_SERVER_KEY is required in production}"
 
-services:
+        compose_content = f"""services:
   hermes:
-    image: {config.docker_image}
-    container_name: hermes-agent
+    image: {image}
+    container_name: hermes
     restart: unless-stopped
+    command: ["gateway", "run"]
     ports:
-      - "{config.host_port}:{config.container_port}"
+      - "{config.api_port}:8642"
+      - "{config.dashboard_port}:9119"
     environment:
-      - MODEL_NAME={config.model_name}
-      - CONTEXT_SIZE={config.context_size}
-      - TEMPERATURE={config.temperature}
-      - TOP_P={config.top_p}
-      - MAX_TOKENS={config.max_tokens}
-      - LOG_LEVEL={config.log_level}
-"""
-        if config.hf_token:
-            compose_content += f"      - HF_TOKEN={config.hf_token}\n"
-        if config.openai_api_key:
-            compose_content += f"      - OPENAI_API_KEY={config.openai_api_key}\n"
-
-        compose_content += f"""    volumes:
-      - {data_dir}:/app/data
-      - {models_dir}:/app/models
+      - HERMES_UID=${{HERMES_UID:-1000}}
+      - HERMES_GID=${{HERMES_GID:-1000}}
+      - API_PROVIDER={config.api_provider}
+      - HERMES_MODEL={config.model_name}
+      - HF_TOKEN={config.hf_token or ""}
+      - OPENAI_API_KEY={config.openai_api_key or ""}
+      - OPENAI_BASE_URL={config.openai_base_url or ""}
+      - OLLAMA_BASE_URL={config.ollama_host or ""}
+      - TELEGRAM_BOT_TOKEN={config.telegram_bot_token or ""}
+      - DISCORD_BOT_TOKEN={config.discord_bot_token or ""}
+      - SLACK_BOT_TOKEN={config.slack_bot_token or ""}
+      - SLACK_APP_TOKEN={config.slack_app_token or ""}
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY={api_key}
+      - HERMES_DASHBOARD={dashboard}
+      - HERMES_DASHBOARD_HOST=127.0.0.1
+    volumes:
+      - hermes-data:/opt/data
     deploy:
       resources:
         limits:
           memory: {config.memory_limit}
           cpus: '{config.cpus_limit}'
         reservations:
-          memory: {config.memory_limit}
-          cpus: '{config.cpus_limit / 2}'
+          memory: 1g
+          cpus: '0.5'
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "hermes"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8642/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 90s
 
 volumes:
   hermes-data:
-  hermes-models:
 """
         if production:
             compose_content += """
@@ -171,6 +187,62 @@ networks:
         if production:
             return self._run_compose_prod(args, check=False).returncode == 0
         return self._run_compose(args, check=False).returncode == 0
+
+    def stream_compose(
+        self,
+        args: list[str],
+        production: bool = False,
+        on_line: Callable[[str], None] | None = None,
+        timeout: float | None = 1800,
+    ) -> tuple[bool, str]:
+        """Run a compose command, streaming its output line by line.
+
+        Returns a ``(ok, output)`` tuple.  *on_line* is called for each line of
+        combined stdout/stderr so the caller can surface live progress.
+        """
+        cmd = [
+            "docker",
+            "compose",
+            "-f",
+            str(self.compose_file if not production else self.compose_prod_file),
+        ]
+        cmd += args
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env=os.environ.copy(),
+            )
+        except (OSError, FileNotFoundError) as exc:
+            message = f"Failed to launch docker compose: {exc}"
+            if on_line:
+                on_line(message)
+            return False, message
+
+        lines: list[str] = []
+        assert proc.stdout is not None
+        try:
+            for raw in proc.stdout:
+                line = raw.rstrip("\n")
+                lines.append(line)
+                if on_line:
+                    on_line(line)
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            message = "docker compose timed out"
+            lines.append(message)
+            if on_line:
+                on_line(message)
+            return False, "\n".join(lines)
+        except Exception:
+            proc.kill()
+            raise
+
+        return proc.returncode == 0, "\n".join(lines)
 
     def stop(self, production: bool = False, volumes: bool = False) -> bool:
         """Stop Hermes agent containers."""

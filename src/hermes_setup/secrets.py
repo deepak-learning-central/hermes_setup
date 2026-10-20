@@ -153,10 +153,19 @@ HERMES_DOCKER_COMPOSE_PROD_FILE={config.docker_compose_prod_file}
 # ==========================================
 # Network Configuration
 # ==========================================
-# Port to expose Hermes agent on host
-HERMES_HOST_PORT={config.host_port}
-# Port inside the container
-HERMES_CONTAINER_PORT={config.container_port}
+# Port to expose the agent's OpenAI-compatible API server on the host
+HERMES_API_PORT={config.api_port}
+# Port to expose the agent's web dashboard on the host
+HERMES_DASHBOARD_PORT={config.dashboard_port}
+# Run the web dashboard alongside the gateway
+HERMES_DASHBOARD={str(config.enable_dashboard).lower()}
+
+# ==========================================
+# API Server Key
+# ==========================================
+# Required to expose the API server (at least 16 characters).
+# Generate one with:  openssl rand -hex 32
+API_SERVER_KEY={config.api_server_key or ""}
 
 # ==========================================
 # Resource Limits
