@@ -71,7 +71,15 @@ cd ~/hermes_setup
 bash start.sh
 ```
 
-Keep this terminal open until setup finishes. No separate `init`, `.env` editing or Docker commands are needed for Hermes deployment.
+This command starts **only the setup web page** on the Pi. It does not install or start the Hermes container. Keep this terminal open until setup finishes. No separate `init`, `.env` editing or Docker commands are needed for Hermes deployment.
+
+| Action | What it does |
+|--------|--------------|
+| `bash start.sh` | Installs the setup application's dependencies and starts its web server on port 8765. |
+| **Set up Hermes** | Saves the form, pulls the Hermes image, applies configuration, starts the container and checks readiness. Use this for the first deployment and configuration changes. |
+| **Start** under Manage your assistant | Starts the container using its existing generated Docker configuration. It does not save edits in the form or run the full setup checks. |
+| **Stop** | Stops and removes the container using `docker compose down`, preserving its data volume and generated configuration. |
+| **Restart** | Stops and recreates the container using its existing generated configuration, preserving its data volume. |
 
 ## 4. Open the page from your laptop
 
@@ -94,12 +102,49 @@ Both services bind to loopback on the Pi. The SSH tunnel makes them accessible p
 In the setup page:
 
 1. Enter your provider’s OpenAI-compatible API URL, exact model ID and API key.
-2. Choose a configuration passphrase of at least 12 characters and keep it somewhere safe.
-3. Optionally adjust the memory/CPU limits under Advanced settings (defaults: 2 GB / 2 CPUs).
-4. Click **Set up Hermes**. Watch progress; the initial image download can take several minutes.
-5. Once the model test passes, click **Open Hermes assistant** and start a conversation in the upstream dashboard.
+2. Optionally enable Telegram, Discord or Slack and enter its tokens and allowed-user IDs (see Messaging channels below).
+3. Choose a configuration passphrase of at least 12 characters and keep it somewhere safe.
+4. Optionally adjust the memory/CPU limits under Advanced settings (defaults: 2 GB / 2 CPUs).
+5. Click **Set up Hermes**. Watch progress; the initial image download can take several minutes.
+6. Once the model test passes, click **Open Hermes assistant** and start a conversation in the upstream dashboard.
 
 You can stop the setup server with Ctrl+C afterwards. Hermes keeps running and restarts automatically after a Pi reboot. To use the assistant later, open the SSH tunnel and visit port 9119; the setup server is only needed for configuration or management.
+
+## Access Hermes after installation
+
+Open **[http://localhost:9119](http://localhost:9119)** on your laptop while the SSH tunnel above is running, or click **Open Hermes assistant** on the setup page. Port 8765 is the setup and management page; port 9119 is the Hermes assistant dashboard.
+
+For everyday browser access, only the dashboard tunnel is needed:
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes \
+  -L 9119:127.0.0.1:9119 \
+  YOUR_USER@PI_ADDRESS
+```
+
+Keep that terminal open while using the dashboard. Reconnect the tunnel after restarting your laptop or Pi. Messaging channels do not require your laptop, this tunnel or the setup web server to remain running; the Pi, Hermes container and its internet connection must be available.
+
+## Automatic startup after a Pi reboot
+
+The generated Compose configuration sets `restart: unless-stopped`. Once deployed and running successfully, Hermes starts again when Docker starts after a Pi reboot. Ensure Docker itself is enabled at boot by running this once **on the Pi**:
+
+```bash
+sudo systemctl enable --now docker
+systemctl is-enabled docker
+```
+
+The second command should print `enabled`. After the next Pi reboot, reconnect with SSH and verify:
+
+```bash
+docker ps --filter name=hermes
+docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' hermes
+```
+
+The container should be running, and its restart policy should print `unless-stopped`. If needed, inspect its logs with `docker compose -f ~/hermes_setup/.hermes-runtime/compose.yml logs --tail 100`.
+
+If you click **Stop** in the setup UI, the container is removed and will **not** come back after reboot. Click **Start** to recreate it before relying on automatic startup again. A container stopped manually with `docker stop hermes` also stays stopped across reboots under this policy. See [Docker restart policy documentation](https://docs.docker.com/engine/containers/start-containers-automatically/).
+
+Neither `bash start.sh` nor the setup page needs to run at boot. Docker starts the existing Hermes container using its stored runtime configuration without requiring your configuration passphrase. The setup web server and laptop SSH tunnel do not start automatically.
 
 ## Messaging channels
 
@@ -131,7 +176,16 @@ Laptop browser → SSH tunnel → Setup page on Pi :8765
 
 The web page is an administration tool. Run it only when needed. Its JavaScript and styles are served locally, with no CDN dependencies. It validates settings before saving and refuses cross-origin browser requests.
 
-Configuration is saved in `.hermes-config.enc`, encrypted using your passphrase. Runtime Compose files live under `.hermes-runtime/`, are gitignored, and have owner-only file permissions. **Those runtime files contain plaintext API credentials** because Docker needs them to restart unattended. Docker administrators can also inspect container environment values. Do not share these files or the Docker socket. The passphrase protects the saved configuration, not the running Docker container.
+Clicking **Set up Hermes** saves the form on the machine hosting the setup server—your Pi in the supported deployment. Typing into the form does not autosave, and clicking **Start** does not save form changes. The encrypted settings are saved before deployment begins, so they can remain saved even if a later deployment step fails.
+
+| Location in the Pi project directory | Contents |
+|--------------------------------------|----------|
+| `.hermes-config.enc` | Model, channel and other setup settings encrypted using your passphrase. Unlock these in the UI to edit them later. |
+| `.hermes-runtime/compose.yml` | Generated Docker runtime configuration used by the normal setup and management flow. |
+| `.hermes-runtime/compose.prod.yml` | Generated production variant. |
+| Docker named volume mounted at `/opt/data` | Hermes runtime configuration, conversations, memories and other persistent assistant state. |
+
+The encrypted file and runtime directory are gitignored, and generated files have owner-only permissions. **The runtime Compose files contain plaintext API and channel credentials** because Docker needs them to restart unattended. Docker administrators can also inspect container environment values. Do not share these files or the Docker socket. The passphrase protects the saved configuration, not the running Docker container.
 
 On Linux, host networking lets the upstream dashboard remain bound to `127.0.0.1` while remaining reachable through your SSH tunnel. The API also binds to loopback. Hermes state lives in the Compose project’s named `hermes-data` volume mounted at `/opt/data`. The wizard sets the upstream `model.default`, `model.provider` and `model.base_url` configuration and chooses the local terminal backend inside the container. Other existing Hermes configuration sections are preserved. The container uses the upstream entrypoint and supervisor.
 

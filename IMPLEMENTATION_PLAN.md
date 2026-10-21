@@ -1,6 +1,11 @@
 > **Current implementation (October 2026):** The supported flow is a web setup wizard
 > launched with `bash start.sh` on the target 64-bit Raspberry Pi. See README.md
 > for installation, SSH access, runtime credential storage, and validation limits.
+> The launcher starts the setup page only; **Set up Hermes** saves configuration
+> and deploys the container. Telegram, Discord and Slack can be configured in
+> the wizard. The **Start** control uses existing runtime configuration. Docker's
+> `unless-stopped` policy handles container startup after reboot when the Docker
+> service is enabled and the container has not been deliberately stopped/removed.
 > The historical checkboxes below are not a verified completion report. TUI,
 > CI/CD, automatic rollback, volume backups, and zero-downtime claims below do
 > not describe the supported wizard. Pi hardware verification remains pending.
