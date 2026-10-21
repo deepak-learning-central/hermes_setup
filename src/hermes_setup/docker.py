@@ -494,7 +494,10 @@ repos:
     def generate_gitleaks_config(self, path: Path | None = None) -> None:
         """Generate .gitleaks.toml configuration."""
         target = path or (self.project_root / ".gitleaks.toml")
-        content = """# Gitleaks configuration for Hermes Setup
+        # NOTE: this is a raw string so the generated file contains "\\." (a
+        # valid TOML basic-string escape) rather than "\." (an invalid TOML
+        # escape that makes gitleaks fail to parse its own config).
+        content = r"""# Gitleaks configuration for Hermes Setup
 # https://github.com/gitleaks/gitleaks
 
 [allowlist]
