@@ -92,8 +92,17 @@ class TestJobManager:
 
 
 @pytest.fixture
-def client() -> TestClient:
-    """Return a test client for the web API."""
+def client(tmp_path, monkeypatch) -> TestClient:
+    """Exercise API contracts without touching real Docker or user config."""
+    from hermes_setup.web import backend
+    from hermes_setup.web.service import SetupService
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(backend, "session", backend.SetupSession(tmp_path / "config.enc"))
+    monkeypatch.setattr(backend.jobs, "manager", JobManager())
+    monkeypatch.setattr(SetupService, "start_streaming", lambda *args, **kwargs: True)
+    monkeypatch.setattr(SetupService, "stop_streaming", lambda *args, **kwargs: True)
+    monkeypatch.setattr(SetupService, "restart_streaming", lambda *args, **kwargs: True)
     return TestClient(app)
 
 

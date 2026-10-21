@@ -132,6 +132,8 @@ class EncryptedConfigManager:
         """
         payload = json.dumps(self.config_to_env_dict(config), indent=2)
         token = self.fernet.encrypt(payload.encode("utf-8"))
+        self.filepath.touch(mode=0o600, exist_ok=True)
+        self.filepath.chmod(0o600)
         self.filepath.write_text(token.decode("utf-8"), encoding="utf-8")
         self._config_cache = None
 

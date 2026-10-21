@@ -7,12 +7,13 @@ passphrase, the encrypted config file location, and the
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from . import jobs
 from .config_manager import EncryptedConfigManager
@@ -26,6 +27,47 @@ app = FastAPI(
     version="0.1.0",
     description="Web-based configuration and Docker orchestration for the Hermes agent",
 )
+
+
+operation_lock = threading.Lock()
+
+
+@app.middleware("http")
+async def local_browser_only(request: Request, call_next: Any) -> Any:
+    """Reject cross-origin browser requests to this local administration tool."""
+    origin = request.headers.get("origin")
+    if origin and origin != str(request.base_url).rstrip("/"):
+        return JSONResponse({"detail": "Cross-origin requests are not allowed"}, status_code=403)
+    host = request.headers.get("host", "").split(":")[0]
+    if host not in {"localhost", "127.0.0.1", "[", "testserver"}:
+        return JSONResponse({"detail": "Use localhost through an SSH tunnel"}, status_code=403)
+    mutations = {
+        "/setup",
+        "/config/save",
+        "/config/load",
+        "/init",
+        "/docker/start",
+        "/docker/stop",
+        "/docker/restart",
+    }
+    if request.method == "POST" and request.url.path in mutations:
+        if not operation_lock.acquire(blocking=False):
+            return JSONResponse(
+                {"detail": "Another configuration operation is in progress"}, status_code=409
+            )
+        try:
+            if any(not job.finished for job in jobs.manager.list()):
+                return JSONResponse(
+                    {"detail": "Wait for the current operation to finish"}, status_code=409
+                )
+            response = await call_next(request)
+        finally:
+            operation_lock.release()
+    else:
+        response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +157,12 @@ async def _startup() -> None:
 async def config_save(request: ConfigSaveRequest) -> JSONResponse:
     """Persist the configuration to an encrypted file on this machine."""
     session.set_passphrase(request.passphrase)
-    session.service.apply_config(request.config)
+    try:
+        session.service.apply_config(request.config)
+    except (ValidationError, ValueError):
+        raise HTTPException(
+            status_code=422, detail="Invalid configuration. Check ports, model and resource values."
+        )
     session.manager.save(session.service.config)
     session.config_loaded = True
     # Regenerate compose files so docker compose up uses the saved values
@@ -135,7 +182,7 @@ async def config_load(request: ConfigLoadRequest) -> JSONResponse:
         raise HTTPException(
             status_code=404, detail="No readable encrypted config found (wrong passphrase?)"
         )
-    session.service.config = loaded
+    session.service = SetupService(loaded)
     session.config_loaded = True
     return JSONResponse({"ok": True, "config": session.manager.config_to_dict(loaded)})
 
@@ -198,6 +245,53 @@ async def docker_status() -> JSONResponse:
     return JSONResponse({"ok": True, **session.service.docker_status()})
 
 
+@app.post("/setup")
+def setup_hermes(request: ConfigSaveRequest) -> JSONResponse:
+    """Save settings and run the complete deployment as one background job."""
+    if any(not job.finished for job in jobs.manager.list()):
+        raise HTTPException(status_code=409, detail="An operation is already running")
+    candidate = SetupService()
+    try:
+        if len(request.passphrase) < 12:
+            raise ValueError("Choose a passphrase of at least 12 characters.")
+        candidate.apply_config(request.config)
+        cfg = candidate.config
+        cfg.validate_channels()
+        if cfg.api_provider != "openai":
+            raise ValueError("Choose an OpenAI-compatible provider for this setup wizard.")
+        if not cfg.openai_api_key or not cfg.openai_base_url or not cfg.model_name.strip():
+            raise ValueError("Provider URL, model name and API key are required.")
+        from urllib.parse import urlparse
+
+        if urlparse(cfg.openai_base_url).scheme not in {"http", "https"}:
+            raise ValueError("Provider URL must start with http:// or https://")
+        if cfg.api_port in {8765, cfg.dashboard_port}:
+            raise ValueError("API, dashboard and setup ports must be different.")
+        if not cfg.api_server_key:
+            import secrets
+
+            cfg.api_server_key = secrets.token_hex(32)
+        if len(cfg.api_server_key) < 16:
+            raise ValueError("API server key must contain at least 16 characters.")
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="Invalid configuration values")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    cfg.docker_compose_file = ".hermes-runtime/compose.yml"
+    cfg.docker_compose_prod_file = ".hermes-runtime/compose.prod.yml"
+    session.set_passphrase(request.passphrase)
+    session.manager.save(cfg)
+    session.service = candidate
+    session.config_loaded = True
+    job = jobs.manager.submit("Set up Hermes", candidate.setup_streaming)
+    return JSONResponse({"ok": True, "job_id": job.id})
+
+
+@app.get("/agent/health")
+def agent_health() -> JSONResponse:
+    return JSONResponse(session.service.agent_health())
+
+
 @app.post("/docker/start")
 async def docker_start(request: DockerActionRequest | None = None) -> JSONResponse:
     """Start the Hermes agent containers (as a background job)."""
@@ -216,7 +310,7 @@ async def docker_stop(request: DockerActionRequest | None = None) -> JSONRespons
     job = jobs.manager.submit(
         "Stopping Hermes",
         lambda emit: session.service.stop_streaming(
-            production=production, volumes=production, on_line=emit
+            production=production, volumes=False, on_line=emit
         ),
     )
     return JSONResponse({"ok": True, "job_id": job.id, "action": job.action})
@@ -344,7 +438,7 @@ async def root() -> FileResponse:
 async def static_files(path: str) -> FileResponse:
     """Serve static assets (CSS, JS) from the frontend directory."""
     file_path = (FRONTEND_DIR / path).resolve()
-    if not str(file_path).startswith(str(FRONTEND_DIR.resolve())):
+    if not file_path.is_relative_to(FRONTEND_DIR.resolve()):
         raise HTTPException(status_code=403, detail="Forbidden")
     if file_path.is_file():
         return FileResponse(file_path)

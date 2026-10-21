@@ -1,8 +1,11 @@
 """Docker Compose orchestration for Hermes agent."""
 
 import contextlib
+import json
 import os
+import platform
 import subprocess
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -91,18 +94,16 @@ class DockerOrchestrator:
         """
         config = self.config
         image = config.docker_image
-        if production and image.endswith(":latest"):
-            image = image.replace(":latest", ":stable")
         dashboard = "1" if config.enable_dashboard else "0"
 
         api_key = config.api_server_key or ""
-        if production and not api_key:
-            # Fail fast rather than silently serving an unauthenticated API.
-            api_key = "${API_SERVER_KEY:?API_SERVER_KEY is required in production}"
+
+        def env_value(name: str, value: str) -> str:
+            return json.dumps(f"{name}={value}".replace("$", "$$"))
 
         compose_content = f"""services:
   hermes:
-    image: {image}
+    image: {json.dumps(image)}
     container_name: hermes
     restart: unless-stopped
     command: ["gateway", "run"]
@@ -112,19 +113,22 @@ class DockerOrchestrator:
     environment:
       - HERMES_UID=${{HERMES_UID:-1000}}
       - HERMES_GID=${{HERMES_GID:-1000}}
-      - API_PROVIDER={config.api_provider}
-      - HERMES_MODEL={config.model_name}
-      - HF_TOKEN={config.hf_token or ""}
-      - OPENAI_API_KEY={config.openai_api_key or ""}
-      - OPENAI_BASE_URL={config.openai_base_url or ""}
-      - OLLAMA_BASE_URL={config.ollama_host or ""}
-      - TELEGRAM_BOT_TOKEN={config.telegram_bot_token or ""}
-      - DISCORD_BOT_TOKEN={config.discord_bot_token or ""}
-      - SLACK_BOT_TOKEN={config.slack_bot_token or ""}
-      - SLACK_APP_TOKEN={config.slack_app_token or ""}
+      - {env_value("API_PROVIDER", config.api_provider)}
+      - {env_value("HERMES_MODEL", config.model_name)}
+      - {env_value("HF_TOKEN", config.hf_token or "")}
+      - {env_value("OPENAI_API_KEY", config.openai_api_key or "")}
+      - {env_value("OPENAI_BASE_URL", config.openai_base_url or "")}
+      - {env_value("OLLAMA_BASE_URL", config.ollama_host or "")}
+      - {env_value("TELEGRAM_BOT_TOKEN", config.telegram_bot_token or "")}
+      - {env_value("TELEGRAM_ALLOWED_USERS", config.telegram_allowed_users or "")}
+      - {env_value("DISCORD_BOT_TOKEN", config.discord_bot_token or "")}
+      - {env_value("DISCORD_ALLOWED_USERS", config.discord_allowed_users or "")}
+      - {env_value("SLACK_BOT_TOKEN", config.slack_bot_token or "")}
+      - {env_value("SLACK_ALLOWED_USERS", config.slack_allowed_users or "")}
+      - {env_value("SLACK_APP_TOKEN", config.slack_app_token or "")}
       - API_SERVER_ENABLED=true
       - API_SERVER_HOST=0.0.0.0
-      - API_SERVER_KEY={api_key}
+      - {env_value("API_SERVER_KEY", api_key)}
       - HERMES_DASHBOARD={dashboard}
       - HERMES_DASHBOARD_HOST=127.0.0.1
     volumes:
@@ -147,6 +151,17 @@ class DockerOrchestrator:
 volumes:
   hermes-data:
 """
+        if platform.system() == "Linux":
+            # Host networking makes the upstream loopback-only dashboard reachable
+            # through an SSH tunnel without weakening dashboard authentication.
+            compose_content = compose_content.replace(
+                f'    ports:\n      - "{config.api_port}:8642"\n      - "{config.dashboard_port}:9119"',
+                "    network_mode: host",
+            ).replace("API_SERVER_HOST=0.0.0.0", "API_SERVER_HOST=127.0.0.1")
+            compose_content = compose_content.replace(
+                "      - API_SERVER_ENABLED=true",
+                f"      - API_SERVER_PORT={config.api_port}\n      - API_SERVER_ENABLED=true",
+            ).replace("http://localhost:8642/health", f"http://localhost:{config.api_port}/health")
         if production:
             compose_content += """
 networks:
@@ -161,9 +176,14 @@ networks:
         self.compose_file.parent.mkdir(parents=True, exist_ok=True)
 
         dev_content = self.generate_compose_file(production=False)
+        self.compose_file.touch(mode=0o600, exist_ok=True)
+        self.compose_file.chmod(0o600)
         self.compose_file.write_text(dev_content)
 
         prod_content = self.generate_compose_file(production=True)
+        self.compose_prod_file.parent.mkdir(parents=True, exist_ok=True)
+        self.compose_prod_file.touch(mode=0o600, exist_ok=True)
+        self.compose_prod_file.chmod(0o600)
         self.compose_prod_file.write_text(prod_content)
 
     def pull_image(self) -> bool:
@@ -222,6 +242,15 @@ networks:
                 on_line(message)
             return False, message
 
+        timed_out = threading.Event()
+
+        def kill_on_timeout() -> None:
+            timed_out.set()
+            proc.kill()
+
+        timer = threading.Timer(timeout, kill_on_timeout) if timeout else None
+        if timer:
+            timer.start()
         lines: list[str] = []
         assert proc.stdout is not None
         try:
@@ -242,6 +271,14 @@ networks:
             proc.kill()
             raise
 
+        finally:
+            if timer:
+                timer.cancel()
+            proc.stdout.close()
+        if timed_out.is_set():
+            if on_line:
+                on_line("docker compose timed out; inspect logs and retry")
+            return False, "docker compose timed out"
         return proc.returncode == 0, "\n".join(lines)
 
     def stop(self, production: bool = False, volumes: bool = False) -> bool:
@@ -275,7 +312,8 @@ networks:
         for line in result.stdout.strip().split("\n"):
             if line:
                 with contextlib.suppress(json.JSONDecodeError):
-                    containers.append(json.loads(line))
+                    parsed = json.loads(line)
+                    containers.extend(parsed if isinstance(parsed, list) else [parsed])
 
         running = any(c.get("State") == "running" for c in containers)
         return {"running": running, "containers": containers}

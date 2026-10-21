@@ -1,3 +1,10 @@
+> **Current implementation (October 2026):** The supported flow is a web setup wizard
+> launched with `bash start.sh` on the target 64-bit Raspberry Pi. See README.md
+> for installation, SSH access, runtime credential storage, and validation limits.
+> The historical checkboxes below are not a verified completion report. TUI,
+> CI/CD, automatic rollback, volume backups, and zero-downtime claims below do
+> not describe the supported wizard. Pi hardware verification remains pending.
+
 # Implementation Plan: Docker-Based Hermes Agent Setup Project
 
 ## Executive Summary

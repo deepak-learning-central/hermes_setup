@@ -1,251 +1,175 @@
-# Hermes Setup
+# Hermes Setup for Raspberry Pi
 
-Portable, credential-free setup for deploying the [Hermes agent](https://hermes-agent.nousresearch.com/) (Nous Research personal assistant) using Docker and Python.
+Run a setup page **on your Raspberry Pi**, open it from your laptop, enter your model credentials, and click **Set up Hermes**. The button downloads the official Hermes container, writes its model configuration, starts the assistant, checks the API and dashboard, and tests a short model response.
 
-![Hermes Setup Demo](docs/demo.gif)
+The Pi runs Hermes; a remote OpenAI-compatible provider runs the language model. You do not need to download an 8B model onto the Pi. You need a provider account, API key, exact model ID, and any required credit. The setup test uses a small number of paid provider tokens.
 
-## Features
+## 1. Prepare the Pi once
 
-- **Docker-based deployment** - Runs the official `nousresearch/hermes-agent` image
-- **Zero-credential repository** - No secrets in git history
-- **Web-based UI configuration** - Browser-based setup with encrypted config storage
-- **Live progress feedback** - Container operations run as background jobs with streaming output
-- **State persistence** - Agent memory and configuration survive updates
-- **Cross-platform** - Works on Linux, macOS, and WSL2
+Use **64-bit Raspberry Pi OS (Bookworm or Trixie)** or another supported 64-bit Debian Linux. `uname -m` should print `aarch64`. The wizard also accepts x86_64 Linux. A Pi 4 or Pi 5 with 4 GB or more RAM is a reasonable starting target; this project has not been hardware-tested on a Pi. Have adequate free storage for the upstream container image and persistent state.
 
-## Quick Start
-
-### Prerequisites
-
-- Docker Engine and Docker Compose
-- Python 3.11+ with [uv](https://docs.astral.sh/uv/)
-- Git
-
-### Installation
+Enable SSH and connect to the Pi. Replace `YOUR_USER` and `PI_ADDRESS` below with your actual username and hostname/IP:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/hermes-setup.git
-cd hermes-setup
+ssh YOUR_USER@PI_ADDRESS
+```
 
-# Install dependencies
+On the Pi, install Git, curl, Docker Engine with the Compose plugin, and uv. If Docker is already installed, skip its installation. The following is the Docker convenience installer for a fresh personal Pi; review it before running. For an existing machine, use the [official Debian installation instructions](https://docs.docker.com/engine/install/debian/).
+
+```bash
+sudo apt update
+sudo apt install -y git curl
+curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+sudo sh /tmp/get-docker.sh
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+exit
+```
+
+Log back in so your Docker group membership and uv path take effect:
+
+```bash
+ssh YOUR_USER@PI_ADDRESS
+docker info
+docker compose version
+uv --version
+```
+
+These commands must succeed **without sudo**. Docker group membership grants administrative control over the machine. Python dependencies are installed by the launcher using the committed lock file; uv can install the required Python version. See [uv installation](https://docs.astral.sh/uv/getting-started/installation/).
+
+## 2. Put this updated project on the Pi
+
+These changes must be copied to the Pi; cloning GitHub alone will not include local changes until you commit and push them.
+
+To copy your current working project directly, run this from your laptop:
+
+```bash
+rsync -av --exclude='.git' --exclude='.venv' --exclude='.env*' \
+  --exclude='.hermes-config.enc' --exclude='.hermes-runtime' \
+  --exclude='backup_*' --exclude='data' --exclude='models' \
+  --exclude='__pycache__' --exclude='.*cache' \
+  /Users/deepaksama/Documents/Development/Repositories/hermes_setup/ \
+  YOUR_USER@PI_ADDRESS:~/hermes_setup/
+```
+
+This intentionally leaves laptop credentials and local data behind. Enter the credentials you want to use on the Pi in the browser.
+
+Alternatively, **after pushing the changes**, clone on the Pi:
+
+```bash
+git clone https://github.com/deepak-learning-central/hermes_setup.git
+cd hermes_setup
+```
+
+## 3. Start the setup page with one command
+
+On the Pi, inside the copied project:
+
+```bash
+cd ~/hermes_setup
+bash start.sh
+```
+
+Keep this terminal open until setup finishes. No separate `init`, `.env` editing or Docker commands are needed for Hermes deployment.
+
+## 4. Open the page from your laptop
+
+In a **second terminal on your laptop**, open this tunnel:
+
+```bash
+ssh -N -o ExitOnForwardFailure=yes \
+  -L 8765:127.0.0.1:8765 \
+  -L 9119:127.0.0.1:9119 \
+  YOUR_USER@PI_ADDRESS
+```
+
+Keep it running, then open:
+
+- **Setup:** [http://localhost:8765](http://localhost:8765)
+- **Assistant after setup succeeds:** [http://localhost:9119](http://localhost:9119)
+
+Both services bind to loopback on the Pi. The SSH tunnel makes them accessible privately on your laptop. Visiting `http://PI_ADDRESS:8765` directly is intentionally unsupported. No router port forwarding is required.
+
+In the setup page:
+
+1. Enter your provider’s OpenAI-compatible API URL, exact model ID and API key.
+2. Choose a configuration passphrase of at least 12 characters and keep it somewhere safe.
+3. Optionally adjust the memory/CPU limits under Advanced settings (defaults: 2 GB / 2 CPUs).
+4. Click **Set up Hermes**. Watch progress; the initial image download can take several minutes.
+5. Once the model test passes, click **Open Hermes assistant** and start a conversation in the upstream dashboard.
+
+You can stop the setup server with Ctrl+C afterwards. Hermes keeps running and restarts automatically after a Pi reboot. To use the assistant later, open the SSH tunnel and visit port 9119; the setup server is only needed for configuration or management.
+
+## Messaging channels
+
+The setup page includes optional **Telegram**, **Discord** and **Slack** configuration. Enable any combination before clicking **Set up Hermes**. Settings are encrypted with the rest of your configuration and passed to the Hermes gateway when it starts.
+
+| Channel | Required values | One-time service setup |
+|---------|-----------------|------------------------|
+| Telegram | Bot token, allowed numeric user IDs | Create a bot with @BotFather using `/newbot`; after deployment open your bot and send `/start`. |
+| Discord | Bot token, allowed numeric user IDs | Create a bot, enable Message Content Intent, and invite it to your server with messaging permissions. Developer Mode lets you copy user IDs. |
+| Slack | Bot token (`xoxb-`), app token (`xapp-`), allowed Member IDs | Create/install an app, enable Socket Mode, and configure the required scopes and event subscriptions. |
+
+Use comma-separated **user IDs**, not usernames or conversation/channel IDs. The wizard requires an explicit allowed-user list for each enabled channel. No channel is required to use the browser assistant.
+
+Follow the upstream [Telegram guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/telegram), [Discord guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/discord), or [Slack guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/slack) for service-specific permissions and finding your user ID. Bot creation and workspace installation still happen in the corresponding service.
+
+To change channels later, unlock saved settings, edit the fields and run setup again. Disable a channel to clear its saved credentials on the next setup run. Setup checks the assistant API/model; it does not send test messages to messaging services. Verify each enabled channel yourself by messaging the bot from an allowed account; inspect **View logs** if it does not reply.
+
+## How it works
+
+```text
+Laptop browser → SSH tunnel → Setup page on Pi :8765
+                                ↓
+                         Docker Compose on Pi
+                                ↓
+                       Hermes gateway + dashboard
+                                ↓
+                         Your model provider
+```
+
+The web page is an administration tool. Run it only when needed. Its JavaScript and styles are served locally, with no CDN dependencies. It validates settings before saving and refuses cross-origin browser requests.
+
+Configuration is saved in `.hermes-config.enc`, encrypted using your passphrase. Runtime Compose files live under `.hermes-runtime/`, are gitignored, and have owner-only file permissions. **Those runtime files contain plaintext API credentials** because Docker needs them to restart unattended. Docker administrators can also inspect container environment values. Do not share these files or the Docker socket. The passphrase protects the saved configuration, not the running Docker container.
+
+On Linux, host networking lets the upstream dashboard remain bound to `127.0.0.1` while remaining reachable through your SSH tunnel. The API also binds to loopback. Hermes state lives in the Compose project’s named `hermes-data` volume mounted at `/opt/data`. The wizard sets the upstream `model.default`, `model.provider` and `model.base_url` configuration and chooses the local terminal backend inside the container. Other existing Hermes configuration sections are preserved. The container uses the upstream entrypoint and supervisor.
+
+Reference: [upstream Docker deployment](https://github.com/NousResearch/hermes-agent/blob/main/docker-compose.yml), [dashboard supervision](https://github.com/NousResearch/hermes-agent/blob/main/docker/s6-rc.d/dashboard/run).
+
+## Management and recovery
+
+- Start, Stop, Restart, View logs and Refresh status are available on the setup page.
+- Stop and Restart preserve the state volume, including in production mode.
+- Refreshing the browser reconnects to the current setup job in the same browser session.
+- Reopen the setup page and unlock saved settings with your passphrase before changing them.
+- If the image pull fails, check Pi internet access, storage and image architecture, then retry.
+- If the model test fails, check the API URL, exact model ID, credentials and account balance. Correct the settings and run setup again. The container may already be running; no successful setup is claimed until the test passes.
+- If the dashboard fails to start, use View logs. Ensure ports 8642 and 9119 are free on the Pi.
+- If SSH reports a forwarding failure, another local process may already use ports 8765 or 9119. Stop that process or tunnel first.
+- If you lose your passphrase, you can enter your settings again and rerun setup. Existing Hermes data remains in Docker; encrypted settings cannot be recovered without the passphrase.
+- Do not run `docker compose down -v` or delete the volume unless you intend to delete assistant state.
+
+For diagnostics on the Pi, use the generated Compose file, not the older files under `docker/`:
+
+```bash
+docker compose -f .hermes-runtime/compose.yml ps
+docker compose -f .hermes-runtime/compose.yml logs --tail 100
+```
+
+The old CLI backup tools refer to host directories and **do not back up this Docker volume**. They are not exposed in the new setup page. To back up the actual state, stop Hermes, identify the named volume using `docker volume ls`, and archive that volume using Docker volume backup tooling. Preserve ownership and restart Hermes after backup. Do not assume that a host `data/` directory contains your assistant’s memories.
+
+An older deployment using `docker/compose.yml` may use a different Compose project and volume. Do not run both against the same ports. Preserve its volume and migrate it explicitly before using the new wizard if it has data you need.
+
+## Development and validation
+
+```bash
 uv sync
-
-# Initialize project (creates config files)
-hermes-setup init
-
-# Launch the web setup UI
-hermes-setup web
-```
-
-## Usage
-
-### Web Setup UI
-
-The web UI runs a local FastAPI backend on `http://127.0.0.1:8765` and serves a browser-based configuration page.
-
-```bash
-# Start the web server
-hermes-setup web
-
-# Custom host/port
-hermes-setup web --host 0.0.0.0 --port 8765
-```
-
-**Capabilities:**
-
-- **Configuration** — Set all Hermes agent values (image, API/dashboard ports, resource limits, model name, provider keys, channel tokens)
-- **Encrypted persistence** — Configuration is saved to `.hermes-config.enc` on your local machine, encrypted with a passphrase you supply. This file is **never committed to the repository**
-- **Docker control** — Start, stop, and restart the agent with live progress output; the operation runs as a background job so the browser stays responsive and you can see exactly what `docker compose` is doing
-- **State management** — Create and restore backups of persistent state
-- **Project init** — Generate compose files, `.env.example`, `.gitignore`, and security hooks
-
-### What gets deployed
-
-The compose files run the official upstream image, `nousresearch/hermes-agent`, in
-gateway mode:
-
-| Surface | Default port | Notes |
-|---------|--------------|-------|
-| OpenAI-compatible API server | `8642` | Requires an `API_SERVER_KEY` of at least 16 characters |
-| Web dashboard | `9119` | Bound to loopback inside the container |
-
-All agent state lives in a single Docker volume mounted at `/opt/data`. A named
-volume (rather than a host bind mount) is used deliberately: SQLite's WAL mode
-is not safe across a macOS/Windows Docker Desktop VM boundary and silently
-corrupts the database.
-
-> **Note on the API server key.** The agent refuses to expose its API server
-> without a key of at least 16 characters. Generate one with
-> `openssl rand -hex 32` and enter it in the Configuration tab. If you leave it
-> blank, the agent generates a loopback-only key at first boot.
-
-### CLI Commands
-
-The CLI provides additional management commands for advanced users:
-
-```bash
-# Start the agent (requires .env file)
-hermes-setup up
-
-# Stop the agent
-hermes-setup down
-
-# Restart the agent
-hermes-setup restart
-
-# View logs
-hermes-setup logs --follow
-
-# Update to latest version
-hermes-setup update
-
-# Show configuration
-hermes-setup config
-
-# Create state backup
-hermes-setup backup
-
-# Restore from backup
-hermes-setup restore
-
-# Run diagnostics
-hermes-setup diagnose
-
-# Generate .env.example template
-hermes-setup generate:env-template
-```
-
-## Configuration
-
-Configuration is managed through the web UI and persisted to an encrypted file
-on this machine. The values map to these environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `HERMES_DOCKER_IMAGE` | Docker image to use | `nousresearch/hermes-agent:latest` |
-| `HERMES_API_PORT` | Host port for the agent's API server | `8642` |
-| `HERMES_DASHBOARD_PORT` | Host port for the agent's web dashboard | `9119` |
-| `HERMES_DASHBOARD` | Run the web dashboard alongside the gateway | `true` |
-| `API_SERVER_KEY` | API server auth key (16+ chars) | *(generated)* |
-| `HERMES_MEMORY_LIMIT` | Memory limit | `4g` |
-| `HERMES_CPUS_LIMIT` | CPU limit | `2.0` |
-| `HERMES_DATA_DIR` | Data directory | `./data` |
-| `HERMES_MODELS_DIR` | Models directory | `./models` |
-| `HERMES_MODEL_NAME` | HuggingFace model | `NousResearch/Hermes-3-Llama-3.1-8B` |
-| `HERMES_CONTEXT_SIZE` | Context window | `8192` |
-| `HERMES_TEMPERATURE` | Sampling temperature | `0.7` |
-| `HERMES_TOP_P` | Top-p parameter | `0.9` |
-| `HERMES_MAX_TOKENS` | Max tokens | `2048` |
-| `HERMES_LOG_LEVEL` | Log level | `INFO` |
-| `API_PROVIDER` | `huggingface`, `openai`, or `ollama` | `huggingface` |
-| `HERMES_HF_TOKEN` | HuggingFace token | — |
-| `HERMES_OPENAI_API_KEY` | OpenAI API key | — |
-| `HERMES_OPENAI_BASE_URL` | OpenAI-compatible base URL | — |
-| `HERMES_OLLAMA_HOST` | Ollama server URL | — |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token | — |
-| `DISCORD_BOT_TOKEN` | Discord bot token | — |
-| `SLACK_BOT_TOKEN` | Slack bot token | — |
-| `SLACK_APP_TOKEN` | Slack app token | — |
-
-## Persistent State
-
-The Hermes agent keeps all of its state — configuration, API keys, sessions,
-skills, and memories — in a single directory mounted at `/opt/data`. This setup
-uses a named Docker volume (`hermes-data`) rather than a host bind mount,
-because SQLite's WAL mode silently corrupts databases that live across a
-macOS or Windows Docker Desktop VM boundary.
-
-The volume survives container updates, so agent memory and configuration are
-preserved across restarts and image changes.
-
-## Security
-
-- **No secrets in repository**: All sensitive values must be in `.env` (gitignored)
-- **Encrypted UI config**: `.hermes-config.enc` holds web UI configuration, encrypted with your passphrase — never committed
-- **Pre-commit hooks**: Prevent accidental secret commits
-- **Environment isolation**: Secrets loaded only at runtime
-
-## Development
-
-### Running Tests
-
-```bash
-# Run test suite
 uv run pytest
-
-# Run with coverage
-uv run pytest --cov=src.hermes_setup
-
-# Run specific test file
-uv run pytest tests/test_config_manager.py
-```
-
-### Code Quality
-
-```bash
-# Run linting
 uv run ruff check src tests
-
-# Run type checking
 uv run mypy src
-
-# Format code
-uv run ruff check --fix src tests
-uv run ruff format src tests
 ```
 
-## Project Structure
+Unit/integration tests mock Docker and provider calls; they verify configuration validation, encrypted persistence, lifecycle behavior, Linux networking and deployment stage failures/success. A successful test suite is not a hardware deployment test. Actual ARM64 image download, dashboard startup and provider access must be verified on your target Pi using the setup button.
 
-```
-hermes-setup/
-├── src/
-│   └── hermes_setup/
-│       ├── __init__.py
-│       ├── __main__.py     # CLI entrypoint
-│       ├── cli.py          # Typer-based CLI
-│       ├── web/            # Web-based UI (FastAPI + HTMX)
-│       │   ├── __init__.py
-│       │   ├── backend.py  # FastAPI server + REST endpoints
-│       │   ├── config_manager.py  # Encrypted config persistence
-│       │   ├── jobs.py     # Background job tracking for Docker ops
-│       │   ├── service.py  # Wraps Docker/State/Config
-│       │   ├── tabs.py     # HTMX tab fragments
-│       │   └── static/     # HTML, CSS, JS assets
-│       │       ├── app.js
-│       │       └── index.html
-│       ├── config.py       # Pydantic settings management
-│       ├── docker.py       # Docker Compose orchestration
-│       ├── secrets.py      # Secrets validation and injection helpers
-│       ├── state.py        # Agent state persistence handling
-│       └── utils.py        # Utility functions
-├── tests/
-│   ├── __init__.py
-│   ├── test_config.py
-│   ├── test_config_manager.py
-│   ├── test_docker.py
-│   └── test_web.py
-├── docker/
-│   ├── compose.yml         # Development Docker compose
-│   ├── compose.prod.yml    # Production Docker compose
-│   └── hermes/config.yaml  # Agent runtime config template
-├── .env.example            # Template for environment variables
-├── .gitignore              # Git ignore rules
-├── .pre-commit-config.yaml # Pre-commit hooks
-├── pyproject.toml          # Project configuration
-└── README.md               # This file
-```
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Disclaimer
-
-This project is not affiliated with Nous Research or the Hermes agent. It is a community-created tool for easier deployment and management.
-
-## Acknowledgments
-
-- [Nous Research Hermes](https://hermes-agent.nousresearch.com/) - The amazing personal assistant
-- [uv](https://docs.astral.sh/uv/) - Fast Python package installer
-- [Pydantic](https://docs.pydantic.dev/) - Data validation and settings management
+The original implementation plan describes earlier TUI and CI/CD ambitions. The supported end-user path is now this browser wizard; n8n, Obsidian, scheduled backups and zero-downtime deployment are not implemented by it.

@@ -34,6 +34,9 @@ _ENV_FIELD_NAMES = {
     "discord_bot_token": "DISCORD_BOT_TOKEN",
     "slack_bot_token": "SLACK_BOT_TOKEN",
     "slack_app_token": "SLACK_APP_TOKEN",
+    "telegram_allowed_users": "TELEGRAM_ALLOWED_USERS",
+    "discord_allowed_users": "DISCORD_ALLOWED_USERS",
+    "slack_allowed_users": "SLACK_ALLOWED_USERS",
     "log_level": "HERMES_LOG_LEVEL",
     "log_file": "HERMES_LOG_FILE",
 }
@@ -197,6 +200,63 @@ class HermesConfig(BaseSettings):
         validation_alias=AliasChoices("HERMES_SLACK_APP_TOKEN", "SLACK_APP_TOKEN"),
     )
 
+    # Explicit per-channel user IDs; avoid opening a personal assistant to everyone.
+    telegram_allowed_users: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("HERMES_TELEGRAM_ALLOWED_USERS", "TELEGRAM_ALLOWED_USERS"),
+    )
+    discord_allowed_users: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("HERMES_DISCORD_ALLOWED_USERS", "DISCORD_ALLOWED_USERS"),
+    )
+    slack_allowed_users: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("HERMES_SLACK_ALLOWED_USERS", "SLACK_ALLOWED_USERS"),
+    )
+
+    @field_validator(
+        "telegram_bot_token",
+        "discord_bot_token",
+        "slack_bot_token",
+        "slack_app_token",
+        "telegram_allowed_users",
+        "discord_allowed_users",
+        "slack_allowed_users",
+        mode="before",
+    )
+    @classmethod
+    def normalize_channel_value(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+    def validate_channels(self) -> None:
+        """Validate optional channel credentials without contacting messaging services."""
+        import re
+
+        for channel in ("telegram", "discord", "slack"):
+            token = getattr(self, f"{channel}_bot_token")
+            users = getattr(self, f"{channel}_allowed_users")
+            if channel == "slack" and bool(token) != bool(self.slack_app_token):
+                raise ValueError(
+                    "Slack requires both a bot token (xoxb-) and an app token (xapp-)."
+                )
+            if not token:
+                continue
+            if not users:
+                raise ValueError(f"{channel.title()}: enter at least one allowed user ID.")
+            pattern = r"[0-9]+" if channel != "slack" else r"[UW][A-Z0-9]+"
+            if any(not re.fullmatch(pattern, user.strip()) for user in users.split(",")):
+                raise ValueError(
+                    f"{channel.title()}: use comma-separated user IDs, not usernames or channel IDs."
+                )
+        if self.telegram_bot_token and not re.fullmatch(
+            r"[0-9]+:[A-Za-z0-9_-]+", self.telegram_bot_token
+        ):
+            raise ValueError("Telegram bot token must have the format supplied by BotFather.")
+        if self.slack_bot_token and not self.slack_bot_token.startswith("xoxb-"):
+            raise ValueError("Slack bot token must start with xoxb-.")
+        if self.slack_app_token and not self.slack_app_token.startswith("xapp-"):
+            raise ValueError("Slack app token must start with xapp-.")
+
     # Logging
     log_level: str = Field(
         default="INFO",
@@ -298,9 +358,12 @@ HERMES_MAX_TOKENS=2048
 #   Slack:    https://api.slack.com/apps → Bot
 #
 # TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+# TELEGRAM_ALLOWED_USERS=123456789
 # DISCORD_BOT_TOKEN=your_discord_bot_token_here
+# DISCORD_ALLOWED_USERS=123456789012345678
 # SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
 # SLACK_APP_TOKEN=xapp-1-your-slack-app-token
+# SLACK_ALLOWED_USERS=U012ABCDEF
 
 # ==========================================
 # Logging
@@ -308,6 +371,15 @@ HERMES_MAX_TOKENS=2048
 HERMES_LOG_LEVEL=INFO
 # HERMES_LOG_FILE=./logs/hermes.log
 """
+
+    @field_validator("memory_limit")
+    @classmethod
+    def validate_memory_limit(cls, value: str) -> str:
+        import re
+
+        if not re.fullmatch(r"[1-9][0-9]*(?:[bkmgBKMG])?", value):
+            raise ValueError("Use a Docker memory size such as 2g or 2048m")
+        return value
 
     @field_validator("log_level")
     @classmethod
