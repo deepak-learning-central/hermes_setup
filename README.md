@@ -148,7 +148,7 @@ Neither `bash start.sh` nor the setup page needs to run at boot. Docker starts t
 
 ## Messaging channels
 
-The setup page includes optional **Telegram**, **Discord** and **Slack** configuration. Enable any combination before clicking **Set up Hermes**. Settings are encrypted with the rest of your configuration and passed to the Hermes gateway when it starts.
+The setup page includes optional **Telegram**, **Discord** and **Slack** configuration. Enable any combination before clicking **Set up Hermes**. Settings are encrypted with the rest of your configuration, passed to the container, and written into the default Hermes profile’s persistent `/opt/data/.env`. Profile-scoped credential loading can then find the tokens after a reboot or gateway restart.
 
 | Channel | Required values | One-time service setup |
 |---------|-----------------|------------------------|
@@ -161,6 +161,18 @@ Use comma-separated **user IDs**, not usernames or conversation/channel IDs. The
 Follow the upstream [Telegram guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/telegram), [Discord guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/discord), or [Slack guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/slack) for service-specific permissions and finding your user ID. Bot creation and workspace installation still happen in the corresponding service.
 
 To change channels later, unlock saved settings, edit the fields and run setup again. Disable a channel to clear its saved credentials on the next setup run. Setup checks the assistant API/model; it does not send test messages to messaging services. Verify each enabled channel yourself by messaging the bot from an allowed account; inspect **View logs** if it does not reply.
+
+## Recover Telegram after a reboot
+
+If logs report that Telegram is enabled but no profile provided a bot credential, the gateway cannot find a profile-owned token. Older versions of this setup project only injected tokens through Docker environment variables; they did not persist them in the default profile’s `.env`. Upstream profile-scoped loading can therefore miss a token even when the container environment contains it.
+
+1. Copy the updated project to your Pi, preserving `.hermes-config.enc`, `.hermes-runtime/` and the Docker volume.
+2. Restart the setup server with `bash start.sh`, then refresh the setup page.
+3. **Unlock saved settings** with your configuration passphrase. Confirm Telegram is enabled and its bot token and allowed numeric user IDs are populated; re-enter them if missing.
+4. Click **Set up Hermes**, rather than **Start**. Setup now writes the credentials to `/opt/data/.env` inside the persistent volume before recreating Hermes. It preserves unrelated profile environment settings and does not print the credentials.
+5. Send `/start` and a message to the bot from an allowed Telegram account. After the next Pi reboot, verify it replies again.
+
+The setup readiness check covers the API, dashboard and model; it does not prove a Telegram conversation works. If Telegram still fails, inspect **View logs** for a rejected token, network errors or another instance polling the same bot. Do not paste your bot token or full generated configuration into issue reports.
 
 ## How it works
 
@@ -183,9 +195,9 @@ Clicking **Set up Hermes** saves the form on the machine hosting the setup serve
 | `.hermes-config.enc` | Model, channel and other setup settings encrypted using your passphrase. Unlock these in the UI to edit them later. |
 | `.hermes-runtime/compose.yml` | Generated Docker runtime configuration used by the normal setup and management flow. |
 | `.hermes-runtime/compose.prod.yml` | Generated production variant. |
-| Docker named volume mounted at `/opt/data` | Hermes runtime configuration, conversations, memories and other persistent assistant state. |
+| Docker named volume mounted at `/opt/data` | Hermes runtime configuration, conversations, memories and other persistent assistant state. Its `.env` stores the wizard-managed channel credentials with owner-only permissions. |
 
-The encrypted file and runtime directory are gitignored, and generated files have owner-only permissions. **The runtime Compose files contain plaintext API and channel credentials** because Docker needs them to restart unattended. Docker administrators can also inspect container environment values. Do not share these files or the Docker socket. The passphrase protects the saved configuration, not the running Docker container.
+The encrypted file and runtime directory are gitignored, and generated files have owner-only permissions. **The runtime Compose files and the profile `.env` contain plaintext credentials** because Docker needs them to restart unattended. Docker administrators can also inspect container environment values. Do not share these files or the Docker socket. The passphrase protects the saved configuration, not the running Docker container.
 
 On Linux, host networking lets the upstream dashboard remain bound to `127.0.0.1` while remaining reachable through your SSH tunnel. The API also binds to loopback. Hermes state lives in the Compose project’s named `hermes-data` volume mounted at `/opt/data`. The wizard sets the upstream `model.default`, `model.provider` and `model.base_url` configuration and chooses the local terminal backend inside the container. Other existing Hermes configuration sections are preserved. The container uses the upstream entrypoint and supervisor.
 
@@ -201,7 +213,7 @@ Reference: [upstream Docker deployment](https://github.com/NousResearch/hermes-a
 - If the model test fails, check the API URL, exact model ID, credentials and account balance. Correct the settings and run setup again. The container may already be running; no successful setup is claimed until the test passes.
 - If the dashboard fails to start, use View logs. Ensure ports 8642 and 9119 are free on the Pi.
 - If SSH reports a forwarding failure, another local process may already use ports 8765 or 9119. Stop that process or tunnel first.
-- If you lose your passphrase, you can enter your settings again and rerun setup. Existing Hermes data remains in Docker; encrypted settings cannot be recovered without the passphrase.
+- If you lose your passphrase, the encrypted settings cannot be recovered. Setup requires unlocking existing settings before reconfiguration to prevent accidentally clearing saved channels. To deliberately start a new setup configuration, stop the setup server, move `.hermes-config.enc` to a private backup location, restart the server and enter all settings again. Preserve the Docker volume; do not delete assistant state.
 - Do not run `docker compose down -v` or delete the volume unless you intend to delete assistant state.
 
 For diagnostics on the Pi, use the generated Compose file, not the older files under `docker/`:

@@ -81,7 +81,7 @@ $('logs').onclick = async () => {
   catch(error) { notice(error.message); }
 };
 $('refresh').onclick = () => status().catch(error => notice(error.message));
-api('/config/status').then(data => { $('unlock').hidden = !data.exists; }).catch(error => notice(error.message));
+api('/config/status').then(data => { $('unlock').hidden = !data.exists; if (data.exists) notice('Unlock your saved settings before running setup again.'); }).catch(error => notice(error.message));
 status().catch(error => notice(error.message));
 const previous = sessionStorage.getItem('hermes-job');
 if (previous) poll(previous);

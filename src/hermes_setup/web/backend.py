@@ -250,6 +250,11 @@ def setup_hermes(request: ConfigSaveRequest) -> JSONResponse:
     """Save settings and run the complete deployment as one background job."""
     if any(not job.finished for job in jobs.manager.list()):
         raise HTTPException(status_code=409, detail="An operation is already running")
+    if session.manager.exists() and not session.config_loaded:
+        raise HTTPException(
+            status_code=409,
+            detail="Unlock your saved settings before running setup again so channel credentials are preserved.",
+        )
     candidate = SetupService()
     try:
         if len(request.passphrase) < 12:

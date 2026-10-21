@@ -202,15 +202,8 @@ class SetupService:
             },
             "terminal": {"backend": "local"},
         }
-        # Update only the keys this wizard owns; preserve other Hermes settings.
-        script = (
-            "import json,pathlib; import hermes_yaml as yaml; "
-            "p=pathlib.Path('/opt/data/config.yaml'); "
-            "c=yaml.safe_load(p.read_text()) if p.exists() else {}; c=c or {}; "
-            f"v=json.loads({json.dumps(json.dumps(runtime))}); "
-            "c.update(v); p.write_text(yaml.safe_dump(c)); "
-            "p.chmod(0o600)"
-        )
+        from .runtime import BOOTSTRAP_SCRIPT, CHANNEL_ENV_KEYS
+
         ok, _ = self.orchestrator.stream_compose(
             [
                 "run",
@@ -221,7 +214,9 @@ class SetupService:
                 "hermes",
                 "python",
                 "-c",
-                script,
+                BOOTSTRAP_SCRIPT,
+                json.dumps(runtime),
+                json.dumps(CHANNEL_ENV_KEYS),
             ],
             on_line=on_line,
         )

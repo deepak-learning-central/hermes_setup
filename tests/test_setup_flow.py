@@ -260,3 +260,14 @@ def test_channel_credentials_can_be_cleared():
     content = service.orchestrator.generate_compose_file()
     assert "123:test" not in content
     assert "TELEGRAM_BOT_TOKEN=" in content
+
+
+def test_resetup_requires_unlocking_existing_config(client):
+    backend.session.set_passphrase("saved-passphrase")
+    backend.session.manager.save(HermesConfig(telegram_bot_token="123:saved-token"))
+    before = backend.session.manager.filepath.read_bytes()
+    backend.session.config_loaded = False
+    response = client.post("/setup", json=payload())
+    assert response.status_code == 409
+    assert "Unlock" in response.json()["detail"]
+    assert backend.session.manager.filepath.read_bytes() == before
